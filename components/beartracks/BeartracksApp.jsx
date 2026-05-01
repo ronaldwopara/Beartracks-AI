@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AskTab } from './AskTab';
 import { AppTweaksPanel } from './AppTweaksPanel';
 import { CreateTab } from './CreateTab';
 import { ProfileTab } from './ProfileTab';
@@ -10,11 +9,39 @@ import { Icon } from './Icon';
 import { C, SANS } from './tokens';
 import { BottomNav, StatusBar } from './ui';
 
-export default function BeartracksApp() {
-  const [tab, setTab] = useState('ask');
-  const [flow, setFlow] = useState('idle');
+const DEFAULT_TRACKERS = {
+  milestones: [],
+  opportunities: [],
+  events: [],
+  calendarEvents: [],
+  missedItems: [],
+};
+
+function generateSimilarItems(title = 'Missed item') {
+  return [
+    {
+      id: crypto.randomUUID(),
+      title: `${title} - related campus event`,
+      opens: 'Opens next week',
+      matchPercent: 91,
+      kind: 'event',
+    },
+    {
+      id: crypto.randomUUID(),
+      title: `${title} - alternate opportunity`,
+      opens: 'Open now',
+      matchPercent: 84,
+      kind: 'opportunity',
+    },
+  ];
+}
+
+export default function BeartracksApp({ studentProfile }) {
+  const [tab, setTab] = useState('create');
+  const [flow, setFlow] = useState('create');
   const [nudge, setNudge] = useState(false);
   const [tweaksOpen, setTweaksOpen] = useState(false);
+  const [trackers, setTrackers] = useState(DEFAULT_TRACKERS);
 
   useEffect(() => {
     const h = (e) => {
@@ -30,29 +57,86 @@ export default function BeartracksApp() {
     if (t !== tab) setTab(t);
   };
 
-  const onAskAdvance = () => {
-    setFlow('create');
-    setTimeout(() => goTo('create'), 350);
-  };
-
-  const onDeploy = () => {
-    setFlow('track');
-    setTimeout(() => goTo('track'), 350);
-  };
-
-  const onNudge = () => {
+  const showNudge = (label = 'Similar match discovered') => {
     setNudge(true);
     setTimeout(() => {
       setNudge(false);
-      setFlow('nudge');
-      goTo('ask');
+      setFlow('track');
     }, 2600);
+    return label;
+  };
+
+  const addCalendarEvents = (incomingEvents) => {
+    setTrackers((prev) => {
+      const all = [...incomingEvents, ...prev.calendarEvents];
+      return { ...prev, calendarEvents: all };
+    });
+  };
+
+  const importIcsEvents = (incomingEvents) => {
+    if (!incomingEvents?.length) return;
+    addCalendarEvents(incomingEvents);
+  };
+
+  const onAcceptDraft = (draft) => {
+    setTrackers((prev) => {
+      const next = { ...prev };
+
+      if (draft.type === 'milestone') {
+        next.milestones = [draft, ...prev.milestones];
+      } else if (draft.type === 'opportunity') {
+        next.opportunities = [draft, ...prev.opportunities];
+      } else if (draft.type === 'event') {
+        next.events = [draft, ...prev.events];
+        if (draft.isUpcoming) {
+          next.calendarEvents = [
+            {
+              id: draft.id,
+              title: draft.title,
+              date: draft.date,
+              time: draft.time,
+              location: draft.location,
+              source: 'Create',
+            },
+            ...prev.calendarEvents,
+          ];
+        } else {
+          next.missedItems = [
+            {
+              id: draft.id,
+              title: draft.title,
+              closedLabel: draft.date || 'Date passed',
+              reason: 'This event date already passed.',
+              similar: generateSimilarItems(draft.title),
+            },
+            ...prev.missedItems,
+          ];
+          showNudge();
+        }
+      }
+
+      return next;
+    });
+
+    setFlow('track');
+    setTimeout(() => goTo('track'), 250);
   };
 
   const tabs = {
-    ask: <AskTab flowState={flow} onAdvance={onAskAdvance} />,
-    create: <CreateTab flowState={flow} onDeploy={onDeploy} />,
-    track: <TrackTab flowState={flow} onNudge={onNudge} />,
+    create: <CreateTab flowState={flow} onAcceptDraft={onAcceptDraft} />,
+    track: (
+      <TrackTab
+        flowState={flow}
+        studentProfile={studentProfile}
+        milestones={trackers.milestones}
+        opportunities={trackers.opportunities}
+        events={trackers.events}
+        calendarEvents={trackers.calendarEvents}
+        missedItems={trackers.missedItems}
+        onImportIcsEvents={importIcsEvents}
+        onSignalNudge={showNudge}
+      />
+    ),
     profile: <ProfileTab />,
   };
 
@@ -116,11 +200,12 @@ export default function BeartracksApp() {
             <div style={{ flex: 1 }}>
               <div style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: 'white' }}>Match found</div>
               <div style={{ fontFamily: SANS, fontSize: 11, color: 'rgba(255,255,255,.78)', marginTop: 2 }}>
-                CAB 2-690 · Tomorrow 1–5 PM
+                Similar opportunity ready in Track
               </div>
             </div>
             <button
               type="button"
+              onClick={() => goTo('track')}
               style={{
                 background: C.gold,
                 border: 'none',

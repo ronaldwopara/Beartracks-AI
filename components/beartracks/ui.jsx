@@ -247,7 +247,6 @@ export function Sheet({ open, onClose, children, height: _height = 'auto' }) {
 
 export const NAV = [
   { id: 'track', label: 'Track', icon: 'grid' },
-  { id: 'ask', label: 'Ask', icon: 'chat' },
   { id: 'create', label: 'Create', icon: 'plus' },
   { id: 'profile', label: 'Profile', icon: 'user' },
 ];
@@ -292,19 +291,6 @@ export function BottomNav({ active, onChange }) {
           >
             <div style={{ position: 'relative' }}>
               <Icon name={t.icon} size={22} color={a ? C.green : C.textLight} strokeWidth={a ? 2 : 1.7} />
-              {t.id === 'ask' && a && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: -2,
-                    right: -3,
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: C.gold,
-                  }}
-                />
-              )}
             </div>
             <span
               style={{

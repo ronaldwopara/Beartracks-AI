@@ -1,164 +1,188 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Icon } from './Icon';
 import { C, SERIF, SANS } from './tokens';
-import { Chip, PulsingDot, Sheet } from './ui';
-import { WhatIfPanel } from './WhatIfPanel';
+import { Sheet } from './ui';
 
-const CLASSES = [
-  { id: 'agent', name: 'Agent', sub: 'Background search that runs continuously', icon: 'sparkles', color: C.green },
-  { id: 'milestone', name: 'Milestone', sub: "Long-term goal you're working toward", icon: 'flag', color: '#7a4ec6' },
-  { id: 'opportunity', name: 'Opportunity', sub: 'A specific event, deadline, or application', icon: 'star', color: C.gold },
-  { id: 'whatif', name: 'What-If', sub: 'Snap a flyer — find similar events', icon: 'image', color: '#c8693a' },
+const CREATE_TYPES = [
+  { id: 'milestone', label: 'Milestone', icon: 'flag', color: '#7a4ec6' },
+  { id: 'opportunity', label: 'Opportunity', icon: 'star', color: C.gold },
+  { id: 'event', label: 'Event', icon: 'calendar', color: C.green },
 ];
 
-function ChipZone({ title, sub, lockColor, chips, onTap }) {
-  return (
-    <div style={{ background: C.surface, borderRadius: 16, border: `1.5px solid ${lockColor}33`, overflow: 'hidden' }}>
-      <div
-        style={{
-          padding: '10px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          borderBottom: `1px solid ${C.border}`,
-        }}
-      >
-        <Icon name={title === 'Dealbreakers' ? 'lock' : 'star'} size={14} color={lockColor} strokeWidth={2} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: lockColor }}>{title}</div>
-          <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight }}>{sub}</div>
-        </div>
-      </div>
-      <div style={{ padding: '12px 14px', display: 'flex', flexWrap: 'wrap', gap: 7, minHeight: 54 }}>
-        {chips.length === 0 ? (
-          <div style={{ fontFamily: SANS, fontSize: 12, color: C.textLight, fontStyle: 'italic', padding: '4px 0' }}>
-            None yet
-          </div>
-        ) : (
-          chips.map((c) => <Chip key={c.id} icon={c.icon} label={c.label} onTap={() => onTap(c)} small />)
-        )}
-      </div>
-    </div>
-  );
+const CLARIFY_STEPS = {
+  milestone: [
+    { key: 'metricCurrent', question: 'What are your current metrics (e.g. applications sent, emails sent)?' },
+    { key: 'nextGoal', question: 'What should the next target goal be for this milestone?' },
+  ],
+  opportunity: [
+    { key: 'deadline', question: 'What is the deadline or critical date for this opportunity?' },
+    { key: 'action', question: 'What action should I prioritize (email, apply, sign up)?' },
+  ],
+  event: [
+    { key: 'date', question: 'When is this event happening?' },
+    { key: 'location', question: 'Where is this event happening?' },
+  ],
+};
+
+const DEFAULT_DRAFTS = [
+  { id: 'draft-1', type: 'milestone', title: 'Research applications sprint', dateLabel: 'Saved 1d ago' },
+  { id: 'draft-2', type: 'opportunity', title: 'Campus ambassador role', dateLabel: 'Saved 3d ago' },
+];
+
+function fallbackQuestion(type, step) {
+  const sequence = CLARIFY_STEPS[type] || [];
+  return sequence[step] || null;
 }
 
-export function CreateTab({ flowState, onDeploy }) {
-  const [selectedClass, setSelectedClass] = useState(flowState === 'create' ? 'agent' : null);
-  const [draft, setDraft] = useState(flowState === 'create');
-  const [db, setDb] = useState(
-    flowState === 'create'
-      ? [
-          { id: 'loc', icon: 'pin', label: 'North Campus', type: 'location' },
-          { id: 'date', icon: 'calendar', label: 'Tomorrow', type: 'date' },
-          { id: 'noise', icon: 'volume-x', label: 'Quiet zone', type: 'amenity' },
-          { id: 'time', icon: 'clock', label: '12:00–5:00 PM', type: 'time' },
-        ]
-      : [],
+function buildStructuredDraft({ type, prompt, answers, attachmentName }) {
+  const nowIso = new Date().toISOString();
+  const id = `${type}-${Date.now()}`;
+  const parsedDate = answers.date || answers.deadline || '';
+  const upcoming = parsedDate ? new Date(parsedDate) >= new Date() : true;
+
+  return {
+    id,
+    createdAt: nowIso,
+    type,
+    title: prompt.slice(0, 80) || `${type} draft`,
+    summary: prompt,
+    date: parsedDate,
+    time: answers.time || '',
+    location: answers.location || '',
+    isUpcoming: upcoming,
+    attachmentName: attachmentName || '',
+    program: answers.program || '',
+    metricCurrent: answers.metricCurrent || '',
+    nextGoal: answers.nextGoal || '',
+    deadline: answers.deadline || '',
+    action: answers.action || '',
+  };
+}
+
+function fieldLabel(name) {
+  if (name === 'metricCurrent') return 'Current metrics';
+  if (name === 'nextGoal') return 'Next goal';
+  if (name === 'attachmentName') return 'Image';
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+export function CreateTab({ flowState, onAcceptDraft }) {
+  const [selectedType, setSelectedType] = useState(flowState === 'create' ? 'event' : 'milestone');
+  const [prompt, setPrompt] = useState('');
+  const [attachmentName, setAttachmentName] = useState('');
+  const [chat, setChat] = useState([]);
+  const [clarifyStep, setClarifyStep] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [answerInput, setAnswerInput] = useState('');
+  const [clarifying, setClarifying] = useState(false);
+  const [draft, setDraft] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [recentDrafts, setRecentDrafts] = useState(DEFAULT_DRAFTS);
+
+  const selectedMeta = useMemo(
+    () => CREATE_TYPES.find((t) => t.id === selectedType) || CREATE_TYPES[0],
+    [selectedType],
   );
-  const [bon, setBon] = useState(
-    flowState === 'create'
-      ? [
-          { id: 'wb', icon: 'eye', label: 'Whiteboard', type: 'amenity' },
-          { id: 'cof', icon: 'compass', label: 'Coffee < 5 min', type: 'proximity' },
-        ]
-      : [],
-  );
-  const [editChip, setEditChip] = useState(null);
-  const [parsing, setParsing] = useState(false);
-  const [deploying, setDeploying] = useState(false);
-  const [nlInput, setNlInput] = useState('');
 
-  useEffect(() => {
-    if (flowState === 'create' && !draft) {
-      setSelectedClass('agent');
-      setDraft(true);
+  const resetConversation = () => {
+    setChat([]);
+    setClarifyStep(0);
+    setAnswers({});
+    setAnswerInput('');
+    setClarifying(false);
+  };
+
+  const requestQuestion = async (step, currentAnswers = answers) => {
+    try {
+      const response = await fetch('/api/agent/clarify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: selectedType,
+          prompt,
+          step,
+          answers: currentAnswers,
+          attachmentName,
+        }),
+      });
+      if (!response.ok) throw new Error('Agent unavailable');
+      const data = await response.json();
+      if (!data.next) return null;
+      return data.next;
+    } catch (_err) {
+      return fallbackQuestion(selectedType, step);
     }
-  }, [flowState, draft]);
-
-  const startNew = (cls) => {
-    setSelectedClass(cls);
-    setNlInput('');
-    setDb([]);
-    setBon([]);
-    setDraft(true);
   };
 
-  if (draft && selectedClass === 'whatif') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.bg }}>
-        <div
-          style={{
-            padding: '14px 20px 12px',
-            background: C.surface,
-            borderBottom: `1px solid ${C.border}`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setDraft(false)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMid, padding: 4, display: 'flex' }}
-          >
-            <span style={{ display: 'flex', transform: 'rotate(180deg)' }}>
-              <Icon name="arrow-right" size={20} />
-            </span>
-          </button>
-          <div>
-            <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 600, color: C.text, letterSpacing: '-0.01em' }}>
-              What-If
-            </div>
-            <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight }}>Find similar events from a flyer</div>
-          </div>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 16px 100px' }}>
-          <WhatIfPanel />
-        </div>
-      </div>
-    );
-  }
-
-  const parse = () => {
-    if (!nlInput.trim()) return;
-    setParsing(true);
-    setTimeout(() => {
-      setParsing(false);
-      setDb([
-        { id: 'loc', icon: 'pin', label: 'North Campus', type: 'location' },
-        { id: 'date', icon: 'calendar', label: 'Tomorrow', type: 'date' },
-        { id: 'noise', icon: 'volume-x', label: 'Quiet zone', type: 'amenity' },
-        { id: 'time', icon: 'clock', label: '12:00–5:00 PM', type: 'time' },
-      ]);
-      setBon([
-        { id: 'wb', icon: 'eye', label: 'Whiteboard', type: 'amenity' },
-        { id: 'cof', icon: 'compass', label: 'Coffee < 5 min', type: 'proximity' },
-      ]);
-    }, 1200);
-  };
-
-  const moveChip = (chip, from) => {
-    if (from === 'db') {
-      setDb((p) => p.filter((c) => c.id !== chip.id));
-      setBon((p) => [...p, chip]);
-    } else {
-      setBon((p) => p.filter((c) => c.id !== chip.id));
-      setDb((p) => [...p, chip]);
+  const startAgentFlow = async () => {
+    if (!prompt.trim()) return;
+    setLoading(true);
+    const userMessage = { role: 'user', text: prompt.trim() };
+    const first = await requestQuestion(0, {});
+    if (!first) {
+      const readyDraft = buildStructuredDraft({ type: selectedType, prompt: prompt.trim(), answers: {}, attachmentName });
+      setDraft(readyDraft);
+      setDrawerOpen(true);
+      setLoading(false);
+      return;
     }
-    setEditChip(null);
+    setClarifying(true);
+    setChat([
+      userMessage,
+      {
+        role: 'assistant',
+        text: first.question,
+      },
+    ]);
+    setClarifyStep(0);
+    setLoading(false);
   };
 
-  const removeChip = (chip, from) => {
-    if (from === 'db') setDb((p) => p.filter((c) => c.id !== chip.id));
-    else setBon((p) => p.filter((c) => c.id !== chip.id));
-    setEditChip(null);
+  const sendAnswer = async () => {
+    if (!answerInput.trim()) return;
+    const previousQuestion = fallbackQuestion(selectedType, clarifyStep);
+    const field = previousQuestion?.key || `answer${clarifyStep + 1}`;
+    const nextAnswers = { ...answers, [field]: answerInput.trim() };
+    const userMessage = { role: 'user', text: answerInput.trim() };
+    setAnswerInput('');
+    setAnswers(nextAnswers);
+
+    const nextStep = clarifyStep + 1;
+    const nextQuestion = await requestQuestion(nextStep, nextAnswers);
+    if (!nextQuestion) {
+      setChat((prev) => [...prev, userMessage]);
+      const readyDraft = buildStructuredDraft({ type: selectedType, prompt: prompt.trim(), answers: nextAnswers, attachmentName });
+      setDraft(readyDraft);
+      setDrawerOpen(true);
+      setClarifying(false);
+      return;
+    }
+
+    setClarifyStep(nextStep);
+    setChat((prev) => [...prev, userMessage, { role: 'assistant', text: nextQuestion.question }]);
   };
 
-  const deploy = () => {
-    setDeploying(true);
-    setTimeout(() => onDeploy(), 900);
+  const acceptDraft = () => {
+    if (!draft) return;
+    if (onAcceptDraft) onAcceptDraft(draft);
+    setRecentDrafts((prev) => [
+      { id: draft.id, type: draft.type, title: draft.title, dateLabel: 'Saved just now' },
+      ...prev.slice(0, 3),
+    ]);
+    setDrawerOpen(false);
+    setDraft(null);
+    setPrompt('');
+    setAttachmentName('');
+    resetConversation();
+  };
+
+  const onAttachment = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAttachmentName(file.name);
   };
 
   return (
@@ -168,415 +192,437 @@ export function CreateTab({ flowState, onDeploy }) {
           Create
         </div>
         <div style={{ fontFamily: SANS, fontSize: 12, color: C.textLight, marginTop: 1 }}>
-          Agents · Milestones · Opportunities
+          Milestones · Opportunities · Events
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', paddingBottom: 130 }}>
-        {!draft && (
-          <div style={{ animation: 'fadeUp .35s ease' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', paddingBottom: 100 }}>
+        <div style={{ animation: 'fadeUp .25s ease' }}>
+          <div
+            style={{
+              border: `1.5px solid ${C.border}`,
+              borderRadius: 16,
+              background: C.surface,
+              padding: '12px 12px 10px',
+            }}
+          >
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Describe what you want to create or track..."
+              style={{
+                width: '100%',
+                minHeight: 96,
+                border: 'none',
+                background: 'none',
+                resize: 'vertical',
+                outline: 'none',
+                fontFamily: SANS,
+                fontSize: 14,
+                color: C.text,
+                lineHeight: 1.5,
+              }}
+            />
+            {attachmentName && (
+              <div
+                style={{
+                  marginBottom: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 9px',
+                  background: C.bg,
+                  borderRadius: 999,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: SANS,
+                  fontSize: 11,
+                  color: C.textMid,
+                }}
+              >
+                <Icon name="image" size={12} />
+                {attachmentName}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label
+                  htmlFor="create-image-upload"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    borderRadius: 10,
+                    border: `1px solid ${C.border}`,
+                    color: C.textMid,
+                    padding: '7px 10px',
+                    cursor: 'pointer',
+                    fontFamily: SANS,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  <Icon name="image" size={13} />
+                  Image
+                </label>
+                <input id="create-image-upload" type="file" accept="image/*" onChange={onAttachment} style={{ display: 'none' }} />
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  style={{
+                    borderRadius: 10,
+                    border: `1px solid ${C.border}`,
+                    background: C.bg,
+                    padding: '7px 9px',
+                    fontFamily: SANS,
+                    fontSize: 12,
+                    color: C.text,
+                  }}
+                >
+                  {CREATE_TYPES.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={startAgentFlow}
+                disabled={!prompt.trim() || loading}
+                style={{
+                  border: 'none',
+                  borderRadius: 12,
+                  background: prompt.trim() ? C.green : C.greenSoft,
+                  color: prompt.trim() ? 'white' : C.textLight,
+                  width: 38,
+                  height: 38,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: prompt.trim() ? 'pointer' : 'default',
+                }}
+              >
+                <Icon name="send" size={16} color={prompt.trim() ? 'white' : C.textLight} />
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+            {CREATE_TYPES.map((item) => {
+              const active = selectedType === item.id;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => setSelectedType(item.id)}
+                  style={{
+                    flex: 1,
+                    borderRadius: 12,
+                    border: `1px solid ${active ? item.color : C.border}`,
+                    background: active ? `${item.color}18` : C.surface,
+                    color: active ? item.color : C.textLight,
+                    fontFamily: SANS,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '9px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    opacity: active ? 1 : 0.5,
+                  }}
+                >
+                  <Icon name={item.icon} size={13} color={active ? item.color : C.textLight} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {chat.length > 0 && (
             <div
               style={{
-                fontFamily: SANS,
-                fontSize: 11,
-                fontWeight: 700,
-                color: C.textMid,
-                letterSpacing: '.08em',
-                textTransform: 'uppercase',
-                marginBottom: 12,
+                marginTop: 14,
+                border: `1px solid ${C.border}`,
+                borderRadius: 14,
+                background: C.surface,
+                padding: '12px',
               }}
             >
-              What are you creating?
+              <div style={{ fontFamily: SANS, fontSize: 11, color: C.textMid, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>
+                Agent clarification
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {chat.map((msg, idx) => (
+                  <div
+                    key={`${msg.role}-${idx}`}
+                    style={{
+                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      maxWidth: '90%',
+                      borderRadius: 10,
+                      background: msg.role === 'user' ? C.green : C.bg,
+                      color: msg.role === 'user' ? 'white' : C.text,
+                      fontFamily: SANS,
+                      fontSize: 12,
+                      padding: '8px 10px',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {msg.text}
+                  </div>
+                ))}
+              </div>
+              {clarifying && (
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  <input
+                    value={answerInput}
+                    onChange={(e) => setAnswerInput(e.target.value)}
+                    placeholder="Answer question..."
+                    style={{
+                      flex: 1,
+                      borderRadius: 10,
+                      border: `1px solid ${C.border}`,
+                      background: 'white',
+                      padding: '9px 10px',
+                      fontFamily: SANS,
+                      fontSize: 13,
+                      color: C.text,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={sendAnswer}
+                    disabled={!answerInput.trim()}
+                    style={{
+                      border: 'none',
+                      borderRadius: 10,
+                      background: answerInput.trim() ? C.green : C.greenSoft,
+                      color: answerInput.trim() ? 'white' : C.textLight,
+                      padding: '0 12px',
+                      fontFamily: SANS,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: answerInput.trim() ? 'pointer' : 'default',
+                    }}
+                  >
+                    Send
+                  </button>
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {CLASSES.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => startNew(c.id)}
+          )}
+
+          {draft && !drawerOpen && (
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              style={{
+                marginTop: 12,
+                width: '100%',
+                borderRadius: 12,
+                border: `1px solid ${C.green}`,
+                background: C.greenSoft,
+                color: C.green,
+                fontFamily: SANS,
+                fontSize: 13,
+                fontWeight: 700,
+                padding: '11px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              Open draft details
+            </button>
+          )}
+
+          <div
+            style={{
+              marginTop: 24,
+              fontFamily: SANS,
+              fontSize: 11,
+              fontWeight: 700,
+              color: C.textMid,
+              letterSpacing: '.08em',
+              textTransform: 'uppercase',
+              marginBottom: 10,
+            }}
+          >
+            Recent drafts
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {recentDrafts.map((item) => {
+              const typeMeta = CREATE_TYPES.find((t) => t.id === item.type) || selectedMeta;
+              return (
+                <div
+                  key={item.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 14,
-                    padding: '18px 18px',
+                    gap: 12,
+                    padding: '12px 12px',
                     background: C.surface,
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 18,
-                    cursor: 'pointer',
-                    transition: 'all .18s',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = c.color;
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.transform = 'translateY(0)';
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
                   }}
                 >
                   <div
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 14,
-                      background: `${c.color}15`,
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      background: `${typeMeta.color}18`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: c.color,
+                      color: typeMeta.color,
                     }}
                   >
-                    <Icon name={c.icon} size={22} strokeWidth={1.8} />
+                    <Icon name={typeMeta.icon} size={15} strokeWidth={2} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 600, color: C.text }}>{c.name}</div>
-                    <div style={{ fontFamily: SANS, fontSize: 12, color: C.textLight, marginTop: 2 }}>{c.sub}</div>
+                    <div style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: C.text }}>{item.title}</div>
+                    <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight, marginTop: 1 }}>
+                      {typeMeta.label} · {item.dateLabel}
+                    </div>
                   </div>
-                  <Icon name="chevron-right" size={18} color={C.textLight} />
-                </button>
-              ))}
-            </div>
-
-            <div
-              style={{
-                marginTop: 28,
-                fontFamily: SANS,
-                fontSize: 11,
-                fontWeight: 700,
-                color: C.textMid,
-                letterSpacing: '.08em',
-                textTransform: 'uppercase',
-                marginBottom: 12,
-              }}
-            >
-              Recent drafts
-            </div>
-            <div
-              style={{
-                padding: '14px 16px',
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: 14,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                opacity: 0.7,
-              }}
-            >
-              <Icon name="flag" size={18} color="#7a4ec6" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.text }}>
-                  Find Summer Research Position
+                  <Icon name="chevron-right" size={16} color={C.textLight} />
                 </div>
-                <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight }}>3 parameters · 2d ago</div>
-              </div>
-              <Icon name="chevron-right" size={16} color={C.textLight} />
-            </div>
+              );
+            })}
           </div>
-        )}
-
-        {draft && (
-          <div style={{ animation: 'fadeUp .3s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <button
-                type="button"
-                onClick={() => setDraft(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMid, padding: 4, display: 'flex' }}
-              >
-                <span style={{ display: 'flex', transform: 'rotate(180deg)' }}>
-                  <Icon name="arrow-right" size={18} />
-                </span>
-              </button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-                {(() => {
-                  const c = CLASSES.find((x) => x.id === selectedClass) || CLASSES[0];
-                  return (
-                    <>
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 9,
-                          background: `${c.color}18`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: c.color,
-                        }}
-                      >
-                        <Icon name={c.icon} size={16} strokeWidth={2} />
-                      </div>
-                      <div style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 600, color: C.text }}>
-                        New {c.name}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: C.surface,
-                border: `1.5px solid ${C.border}`,
-                borderRadius: 16,
-                padding: '12px 14px',
-                marginBottom: 18,
-              }}
-            >
-              <textarea
-                value={nlInput}
-                onChange={(e) => setNlInput(e.target.value)}
-                placeholder="Describe what you want to track in plain English…"
-                style={{
-                  width: '100%',
-                  minHeight: 54,
-                  border: 'none',
-                  background: 'none',
-                  resize: 'none',
-                  fontSize: 14,
-                  fontFamily: SANS,
-                  color: C.text,
-                  outline: 'none',
-                  lineHeight: 1.5,
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                <button
-                  type="button"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: C.textLight,
-                    fontSize: 12,
-                    fontFamily: SANS,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '4px 0',
-                  }}
-                >
-                  <Icon name="mic" size={14} />
-                  Voice
-                </button>
-                <button
-                  type="button"
-                  onClick={parse}
-                  disabled={!nlInput.trim()}
-                  style={{
-                    background: nlInput.trim() ? C.green : C.greenSoft,
-                    color: nlInput.trim() ? 'white' : C.textLight,
-                    border: 'none',
-                    borderRadius: 12,
-                    padding: '8px 16px',
-                    fontFamily: SANS,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: nlInput.trim() ? 'pointer' : 'default',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <Icon name="wand" size={14} strokeWidth={2} />
-                  {parsing ? 'Parsing…' : 'Parse'}
-                </button>
-              </div>
-            </div>
-
-            {parsing && (
-              <div style={{ padding: '40px 0', textAlign: 'center' }}>
-                <div style={{ fontFamily: SANS, fontSize: 13, color: C.textMid, marginBottom: 14 }}>
-                  Reading intent → extracting parameters
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 5 }}>
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: C.green,
-                        animation: `typingDot 1s ease ${i * 0.13}s infinite`,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!parsing && (db.length > 0 || bon.length > 0) && (
-              <>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    padding: '10px 12px',
-                    background: C.goldLight,
-                    borderRadius: 12,
-                    border: `1px solid ${C.gold}55`,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Icon name="sparkles" size={14} color={C.gold} strokeWidth={2} />
-                  <p style={{ margin: 0, fontFamily: SANS, fontSize: 12, color: '#7a5e1c', lineHeight: 1.5 }}>
-                    Parsed &quot;quiet&quot; as a Dealbreaker, &quot;whiteboard&quot; as a Bonus. Tap any chip to adjust.
-                  </p>
-                </div>
-
-                <ChipZone
-                  title="Dealbreakers"
-                  sub="Must match all"
-                  lockColor={C.green}
-                  chips={db}
-                  onTap={(c) => setEditChip({ ...c, zone: 'db' })}
-                />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 4px' }}>
-                  <div style={{ flex: 1, height: 1, background: C.border }} />
-                  <span
-                    style={{
-                      fontFamily: SANS,
-                      fontSize: 10,
-                      color: C.textLight,
-                      fontWeight: 700,
-                      letterSpacing: '.12em',
-                    }}
-                  >
-                    AND
-                  </span>
-                  <div style={{ flex: 1, height: 1, background: C.border }} />
-                </div>
-
-                <ChipZone
-                  title="Bonuses"
-                  sub="Nice-to-haves, ranked higher"
-                  lockColor={C.gold}
-                  chips={bon}
-                  onTap={(c) => setEditChip({ ...c, zone: 'bon' })}
-                />
-              </>
-            )}
-          </div>
-        )}
+        </div>
       </div>
 
-      {draft && (db.length > 0 || bon.length > 0) && !parsing && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 74,
-            left: 0,
-            right: 0,
-            padding: '12px 16px',
-            background: 'linear-gradient(180deg, rgba(250,251,249,0) 0%, rgba(250,251,249,1) 30%)',
-          }}
-        >
-          <button
-            type="button"
-            onClick={deploy}
-            style={{
-              width: '100%',
-              background: deploying ? C.greenDeep : C.green,
-              color: 'white',
-              border: 'none',
-              borderRadius: 18,
-              padding: '15px',
-              fontFamily: SANS,
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-              boxShadow: `0 4px 18px ${C.green}55`,
-              transition: 'all .25s',
-              transform: deploying ? 'scale(.98)' : 'scale(1)',
-            }}
-          >
-            {deploying ? (
-              <>
-                <PulsingDot color="white" size={6} />
-                Deploying agent…
-              </>
-            ) : (
-              <>
-                Deploy agent <Icon name="arrow-right" size={16} strokeWidth={2.4} />
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      <Sheet open={!!editChip} onClose={() => setEditChip(null)}>
-        {editChip && (
+      <Sheet open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        {draft && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
               <div
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '7px 14px',
-                  background: C.greenSoft,
-                  border: `1px solid ${C.green}33`,
-                  borderRadius: 18,
-                }}
-              >
-                <Icon name={editChip.icon} size={14} color={C.green} />
-                <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.text }}>{editChip.label}</span>
-              </div>
-              <span style={{ fontFamily: SANS, fontSize: 12, color: C.textLight }}>
-                in {editChip.zone === 'db' ? 'Dealbreakers' : 'Bonuses'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => moveChip(editChip, editChip.zone)}
-                style={{
-                  padding: '14px 16px',
-                  background: C.bg,
-                  border: `1.5px solid ${C.border}`,
-                  borderRadius: 14,
-                  cursor: 'pointer',
+                  width: 32,
+                  height: 32,
+                  borderRadius: 11,
+                  background: `${selectedMeta.color}18`,
+                  color: selectedMeta.color,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
+                  justifyContent: 'center',
                 }}
               >
-                <Icon name="arrow-up" size={16} color={C.green} />
-                <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 500, color: C.text, flex: 1, textAlign: 'left' }}>
-                  Move to {editChip.zone === 'db' ? 'Bonuses' : 'Dealbreakers'}
-                </span>
+                <Icon name={selectedMeta.icon} size={15} strokeWidth={2} />
+              </div>
+              <div>
+                <div style={{ fontFamily: SANS, color: C.textMid, fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}>
+                  Review draft
+                </div>
+                <div style={{ fontFamily: SERIF, color: C.text, fontSize: 20, fontWeight: 600 }}>
+                  {selectedMeta.label}
+                </div>
+              </div>
+            </div>
+
+            {Object.entries(draft)
+              .filter(([key]) => !['id', 'createdAt', 'type'].includes(key))
+              .map(([key, value]) => (
+                <div key={key} style={{ marginBottom: 10 }}>
+                  <label style={{ display: 'block', fontFamily: SANS, fontSize: 11, color: C.textLight, marginBottom: 4 }}>
+                    {fieldLabel(key)}
+                  </label>
+                  <input
+                    value={typeof value === 'boolean' ? String(value) : value || ''}
+                    onChange={(e) =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        [key]: key === 'isUpcoming' ? e.target.value !== 'false' : e.target.value,
+                      }))
+                    }
+                    placeholder={fieldLabel(key)}
+                    style={{
+                      width: '100%',
+                      borderRadius: 10,
+                      border: `1px solid ${C.border}`,
+                      background: 'white',
+                      padding: '10px 10px',
+                      fontFamily: SANS,
+                      fontSize: 13,
+                      color: C.text,
+                    }}
+                  />
+                </div>
+              ))}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={acceptDraft}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  borderRadius: 12,
+                  background: C.green,
+                  color: 'white',
+                  padding: '12px 10px',
+                  fontFamily: SANS,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Accept tracker
               </button>
               <button
                 type="button"
-                onClick={() => removeChip(editChip, editChip.zone)}
+                onClick={() => setDrawerOpen(false)}
                 style={{
-                  padding: '14px 16px',
-                  background: C.errLight,
-                  border: `1.5px solid ${C.err}33`,
-                  borderRadius: 14,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 12,
+                  background: C.surface,
+                  color: C.textMid,
+                  padding: '12px 12px',
+                  fontFamily: SANS,
+                  fontSize: 13,
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
                 }}
               >
-                <Icon name="trash" size={16} color={C.err} />
-                <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 500, color: C.err, flex: 1, textAlign: 'left' }}>
-                  Remove
-                </span>
+                Later
               </button>
             </div>
           </div>
         )}
       </Sheet>
+
+      {loading && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(15,23,18,.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 200,
+          }}
+        >
+          <div
+            style={{
+              padding: '11px 14px',
+              borderRadius: 10,
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              fontFamily: SANS,
+              fontSize: 12,
+              color: C.textMid,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Icon name="sparkles" size={14} color={C.green} />
+            Agent is preparing a follow-up question...
+          </div>
+        </div>
+      )}
     </div>
   );
 }

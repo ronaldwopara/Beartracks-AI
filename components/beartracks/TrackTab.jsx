@@ -1,391 +1,221 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Icon } from './Icon';
 import { C, SERIF, SANS } from './tokens';
-import { PulsingDot } from './ui';
+import { Sheet } from './ui';
 
-function Stat({ label, value, icon, highlight }) {
-  return (
-    <div style={{ flex: 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-        <Icon name={icon} size={11} color={highlight ? C.green : C.textLight} />
-        <span style={{ fontFamily: SANS, fontSize: 10, color: C.textLight, fontWeight: 500 }}>{label}</span>
-      </div>
-      <div
-        style={{
-          fontFamily: SERIF,
-          fontSize: 18,
-          fontWeight: 600,
-          color: highlight ? C.green : C.text,
-          letterSpacing: '-0.01em',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
+const DEFAULT_MILESTONES = [
+  {
+    id: 'm-default',
+    title: 'Summer research position',
+    metricCurrent: 'Applications: 7 · Emails: 4 · Replies: 2',
+    nextGoal: 'Send 5 more applications by Friday',
+    date: 'This week',
+  },
+];
+
+const DEFAULT_OPPORTUNITIES = [
+  {
+    id: 'o-default',
+    title: 'BIOL 207 add/drop deadline',
+    deadline: 'Friday · 4:30 PM',
+    action: 'Email advisor for override options',
+    summary: 'Need approval path and quick follow-up.',
+  },
+];
+
+function toDateString(input, fallback = 'TBD') {
+  if (!input) return fallback;
+  const parsed = new Date(input);
+  if (Number.isNaN(parsed.getTime())) return input;
+  return parsed.toLocaleDateString();
 }
 
-function ScanningCard({ progress, stage, stageNames, stageDetails }) {
-  const isFound = stage === 3;
-  return (
-    <div
-      style={{
-        background: C.surface,
-        borderRadius: 18,
-        border: `1.5px solid ${isFound ? C.green : C.border}`,
-        padding: '16px',
-        position: 'relative',
-        overflow: 'hidden',
-        boxShadow: isFound ? `0 4px 20px ${C.green}22` : '0 1px 3px rgba(0,0,0,.04)',
-        transition: 'border-color .4s, box-shadow .4s',
-      }}
-    >
-      {!isFound && (
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              height: 2,
-              background: `linear-gradient(90deg,transparent,${C.green}66,transparent)`,
-              animation: 'scanLine 2s linear infinite',
-            }}
-          />
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12, position: 'relative' }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 11,
-            background: C.greenSoft,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Icon name="sparkles" size={18} color={C.green} strokeWidth={1.8} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <span
-              style={{
-                fontFamily: SANS,
-                fontSize: 10,
-                fontWeight: 700,
-                color: C.green,
-                textTransform: 'uppercase',
-                letterSpacing: '.06em',
-              }}
-            >
-              Agent
-            </span>
-            <span style={{ fontFamily: SANS, fontSize: 10, color: C.textLight }}>· just now</span>
-          </div>
-          <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, color: C.text }}>Quiet study room</div>
-          <div
-            style={{
-              fontFamily: SANS,
-              fontSize: 12,
-              color: isFound ? C.green : C.textMid,
-              marginTop: 3,
-              fontWeight: isFound ? 600 : 400,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-            }}
-          >
-            {!isFound && <PulsingDot size={5} />}
-            {isFound ? '✓ ' : ''}
-            {stageDetails[stage]}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {stageNames.map((n, i) => (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <div
-              style={{
-                height: 3,
-                borderRadius: 2,
-                background: i <= stage ? C.green : C.border,
-                transition: 'background .3s',
-              }}
-            />
-            <div
-              style={{
-                fontFamily: SANS,
-                fontSize: 9.5,
-                color: i === stage ? C.green : C.textLight,
-                fontWeight: i === stage ? 700 : 500,
-                letterSpacing: '.02em',
-              }}
-            >
-              {n}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {!isFound && (
-        <div style={{ display: 'flex', gap: 14, padding: '10px 12px', background: C.bg, borderRadius: 10 }}>
-          <Stat label="Scanned" value={Math.round(progress * 8.4)} icon="eye" />
-          <Stat label="Filtered" value={stage >= 1 ? Math.round(progress * 1.7) : 0} icon="sliders" />
-          <Stat label="Matches" value={stage >= 2 ? Math.max(0, Math.round((progress - 66) / 12)) : 0} icon="target" highlight />
-        </div>
-      )}
-
-      {isFound && (
-        <div style={{ padding: '12px 14px', background: C.greenSoft, borderRadius: 12, border: `1px solid ${C.green}33` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 600, color: C.text }}>CAB 2-690</div>
-            <div
-              style={{
-                padding: '2px 8px',
-                borderRadius: 9,
-                background: C.green,
-                fontFamily: SANS,
-                fontSize: 9,
-                fontWeight: 700,
-                color: 'white',
-                letterSpacing: '.04em',
-              }}
-            >
-              OPEN
-            </div>
-          </div>
-          <div style={{ fontFamily: SANS, fontSize: 12, color: C.textMid }}>
-            Tomorrow · 1:00–5:00 PM · Whiteboard ✓
-          </div>
-        </div>
-      )}
-    </div>
-  );
+function toIcsDateStamp(dateText, timeText = '120000') {
+  const parsed = new Date(dateText);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const y = parsed.getUTCFullYear();
+  const m = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getUTCDate()).padStart(2, '0');
+  const cleanTime = timeText.replace(/[^0-9]/g, '').padEnd(6, '0').slice(0, 6);
+  return `${y}${m}${d}T${cleanTime}Z`;
 }
 
-function MilestoneCard() {
-  const subs = [
-    { l: 'Identify 3 advisors', done: true },
-    { l: 'Email Dr. Lin', done: true },
-    { l: 'Submit 2 grant apps', done: false },
-    { l: 'Lock summer position', done: false },
-  ];
-  const completed = subs.filter((s) => s.done).length;
-  return (
-    <div style={{ background: C.surface, borderRadius: 18, border: `1px solid ${C.border}`, padding: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 11,
-            background: '#7a4ec618',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Icon name="flag" size={18} color="#7a4ec6" strokeWidth={1.8} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <span
-              style={{
-                fontFamily: SANS,
-                fontSize: 10,
-                fontWeight: 700,
-                color: '#7a4ec6',
-                textTransform: 'uppercase',
-                letterSpacing: '.06em',
-              }}
-            >
-              Milestone
-            </span>
-            <span style={{ fontFamily: SANS, fontSize: 10, color: C.textLight }}>· 14 days left</span>
-          </div>
-          <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, color: C.text }}>Summer research position</div>
-          <div style={{ fontFamily: SANS, fontSize: 12, color: C.textMid, marginTop: 3 }}>
-            {completed}/{subs.length} steps complete
-          </div>
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {subs.map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                borderRadius: 5,
-                border: `1.5px solid ${s.done ? '#7a4ec6' : C.border}`,
-                background: s.done ? '#7a4ec6' : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {s.done && <Icon name="check" size={11} color="white" strokeWidth={3} />}
-            </div>
-            <span
-              style={{
-                fontFamily: SANS,
-                fontSize: 13,
-                color: s.done ? C.textLight : C.text,
-                textDecoration: s.done ? 'line-through' : 'none',
-              }}
-            >
-              {s.l}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function buildIcs(events) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Beartracks AI//EN'];
+  events.forEach((event) => {
+    const start = toIcsDateStamp(event.date, event.time);
+    if (!start) return;
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:${event.id || `beartracks-${Date.now()}`}`);
+    lines.push(`DTSTAMP:${start}`);
+    lines.push(`DTSTART:${start}`);
+    lines.push(`SUMMARY:${event.title || 'Beartracks event'}`);
+    lines.push(`LOCATION:${event.location || 'UAlberta'}`);
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\n');
 }
 
-function OpportunityCard() {
-  const days = 4;
-  const hrs = 12;
-  return (
-    <div style={{ background: C.surface, borderRadius: 18, border: `1px solid ${C.border}`, padding: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 11,
-            background: C.goldLight,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Icon name="star" size={18} color={C.gold} strokeWidth={1.8} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <span
-              style={{
-                fontFamily: SANS,
-                fontSize: 10,
-                fontWeight: 700,
-                color: '#9a7400',
-                textTransform: 'uppercase',
-                letterSpacing: '.06em',
-              }}
-            >
-              Opportunity
-            </span>
-          </div>
-          <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, color: C.text }}>BIOL 207 add/drop deadline</div>
-          <div style={{ fontFamily: SANS, fontSize: 12, color: C.textMid, marginTop: 3 }}>Friday · 4:30 PM</div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div
-            style={{
-              fontFamily: SERIF,
-              fontSize: 24,
-              fontWeight: 600,
-              color: C.gold,
-              lineHeight: 1,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            {days}d
-          </div>
-          <div style={{ fontFamily: SANS, fontSize: 10, color: C.textLight, marginTop: 2 }}>{hrs}h left</div>
-        </div>
-      </div>
-      <div style={{ marginTop: 12, display: 'flex', gap: 6 }}>
-        <button
-          type="button"
-          style={{
-            flex: 1,
-            padding: '9px',
-            background: C.gold,
-            border: 'none',
-            borderRadius: 10,
-            fontFamily: SANS,
-            fontSize: 12,
-            fontWeight: 700,
-            color: 'white',
-            cursor: 'pointer',
-          }}
-        >
-          Draft email to advisor
-        </button>
-        <button
-          type="button"
-          style={{
-            padding: '9px 12px',
-            background: 'transparent',
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
-            fontFamily: SANS,
-            fontSize: 12,
-            fontWeight: 600,
-            color: C.textMid,
-            cursor: 'pointer',
-          }}
-        >
-          Snooze
-        </button>
-      </div>
-    </div>
-  );
+function parseIcs(content) {
+  const blocks = content.split('BEGIN:VEVENT').slice(1);
+  return blocks
+    .map((block, index) => {
+      const lines = block.split('\n');
+      const summary = lines.find((line) => line.startsWith('SUMMARY:'))?.replace('SUMMARY:', '').trim();
+      const location = lines.find((line) => line.startsWith('LOCATION:'))?.replace('LOCATION:', '').trim();
+      const rawDate = lines.find((line) => line.startsWith('DTSTART:'))?.replace('DTSTART:', '').trim();
+      if (!summary || !rawDate) return null;
+      const y = rawDate.slice(0, 4);
+      const m = rawDate.slice(4, 6);
+      const d = rawDate.slice(6, 8);
+      return {
+        id: `ics-${Date.now()}-${index}`,
+        title: summary,
+        date: `${y}-${m}-${d}`,
+        time: '1200',
+        location: location || 'Imported',
+        source: 'ICS import',
+      };
+    })
+    .filter(Boolean);
 }
 
-export function TrackTab({ flowState, onNudge }) {
-  const [scanProgress, setScanProgress] = useState(0);
-  const [scanStage, setScanStage] = useState(0);
-  const nudged = useRef(false);
+async function callJson(endpoint, body) {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error('Request failed');
+  return response.json();
+}
 
-  const stageNames = ['Scanning', 'Filtering', 'Matching', 'Match found'];
-  const stageDetails = ['Crawling room.ualberta.ca', 'Applying dealbreakers', 'Ranking by bonuses', 'CAB 2-690 available'];
+export function TrackTab({
+  studentProfile,
+  milestones,
+  opportunities,
+  events,
+  calendarEvents,
+  missedItems,
+  onImportIcsEvents,
+  onSignalNudge,
+}) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [emailDraftResult, setEmailDraftResult] = useState('');
+  const [searchResult, setSearchResult] = useState('');
 
-  useEffect(() => {
-    if (flowState !== 'track') {
-      setScanProgress(0);
-      setScanStage(0);
-      return;
+  const milestoneCards = milestones?.length ? milestones : DEFAULT_MILESTONES;
+  const opportunityCards = opportunities?.length ? opportunities : DEFAULT_OPPORTUNITIES;
+  const eventCards = events || [];
+  const missedCards = missedItems || [];
+  const calendarItems = calendarEvents || [];
+
+  const sortedCalendar = useMemo(() => {
+    return [...calendarItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [calendarItems]);
+
+  const exportIcs = () => {
+    if (!calendarItems.length) return;
+    const content = buildIcs(calendarItems);
+    const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'beartracks-events.ics';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportIcs = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const parsed = parseIcs(text);
+    if (parsed.length && onImportIcsEvents) onImportIcsEvents(parsed);
+  };
+
+  const draftEmail = async (opportunity) => {
+    setBusy(true);
+    try {
+      const result = await callJson('/api/agent/email/draft', {
+        title: opportunity.title,
+        context: opportunity.summary || opportunity.action || '',
+      });
+      setEmailDraftResult(`${result.subject}: ${result.preview}`);
+    } catch (_err) {
+      setEmailDraftResult('Unable to draft email right now.');
+    } finally {
+      setBusy(false);
     }
-    let v = 0;
-    const iv = setInterval(() => {
-      v += Math.random() * 5 + 2;
-      if (v >= 100) {
-        v = 100;
-        clearInterval(iv);
-        setScanStage(3);
-        if (!nudged.current) {
-          nudged.current = true;
-          setTimeout(() => onNudge && onNudge(), 900);
-        }
-      } else if (v >= 66) setScanStage(2);
-      else if (v >= 33) setScanStage(1);
-      setScanProgress(Math.min(v, 100));
-    }, 350);
-    return () => clearInterval(iv);
-  }, [flowState, onNudge]);
+  };
+
+  const sendEmail = async (opportunity) => {
+    const approved = window.confirm(`Send this email action now for "${opportunity.title}"?`);
+    if (!approved) return;
+    setBusy(true);
+    try {
+      await callJson('/api/agent/email/send', {
+        title: opportunity.title,
+        recipient: 'advisor@ualberta.ca',
+      });
+      setEmailDraftResult('Email action sent successfully.');
+      if (onSignalNudge) onSignalNudge('Email sent');
+    } catch (_err) {
+      setEmailDraftResult('Could not send email.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runSearch = async (title) => {
+    setBusy(true);
+    try {
+      const result = await callJson('/api/agent/search', { query: title });
+      const top = result.results?.[0];
+      setSearchResult(top ? `${top.title} (${top.matchPercent}% match)` : 'No similar results right now.');
+    } catch (_err) {
+      setSearchResult('Search service unavailable.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.bg }}>
       <div style={{ padding: '14px 20px 12px', background: C.surface, borderBottom: `1px solid ${C.border}` }}>
-        <div>
-          <div style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, color: C.text, letterSpacing: '-0.01em' }}>
-            Track
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, color: C.text, letterSpacing: '-0.01em' }}>
+              Track
+            </div>
+            <div style={{ fontFamily: SANS, fontSize: 12, color: C.textLight, marginTop: 1 }}>
+              {milestoneCards.length + opportunityCards.length + eventCards.length} active ·{' '}
+              {studentProfile?.name ? `for ${studentProfile.name}` : 'UAlberta workspace'}
+            </div>
           </div>
-          <div style={{ fontFamily: SANS, fontSize: 12, color: C.textLight, marginTop: 1 }}>
-            {flowState === 'track' ? '3 active · 1 scanning' : '2 active'}
-          </div>
+          <button
+            type="button"
+            onClick={() => setCalendarOpen(true)}
+            style={{
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+              background: C.bg,
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: C.textMid,
+            }}
+            aria-label="Open calendar"
+          >
+            <Icon name="calendar" size={18} color={C.textMid} />
+          </button>
         </div>
       </div>
 
@@ -405,11 +235,99 @@ export function TrackTab({ flowState, onNudge }) {
           Active
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
-          {flowState === 'track' && (
-            <ScanningCard progress={scanProgress} stage={scanStage} stageNames={stageNames} stageDetails={stageDetails} />
-          )}
-          <MilestoneCard />
-          <OpportunityCard />
+          {milestoneCards.map((item) => (
+            <div key={item.id} style={{ background: C.surface, borderRadius: 18, border: `1px solid ${C.border}`, padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 11, background: '#7a4ec618', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="flag" size={16} color="#7a4ec6" strokeWidth={2} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: SERIF, color: C.text, fontSize: 18, fontWeight: 600 }}>{item.title}</div>
+                  <div style={{ fontFamily: SANS, color: C.textLight, fontSize: 11, marginTop: 2 }}>
+                    Milestone metrics · {toDateString(item.date, 'No date')}
+                  </div>
+                </div>
+              </div>
+              <div style={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.bg, padding: '10px 11px', marginBottom: 8 }}>
+                <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight, marginBottom: 4 }}>Current metrics</div>
+                <div style={{ fontFamily: SANS, fontSize: 13, color: C.text }}>{item.metricCurrent || 'Set your metrics from Create.'}</div>
+              </div>
+              <div style={{ borderRadius: 12, border: `1px solid ${C.green}40`, background: C.greenSoft, padding: '10px 11px' }}>
+                <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight, marginBottom: 4 }}>Next goal</div>
+                <div style={{ fontFamily: SANS, fontSize: 13, color: C.green, fontWeight: 700 }}>{item.nextGoal || 'Set next target in your draft drawer.'}</div>
+              </div>
+            </div>
+          ))}
+
+          {opportunityCards.map((item) => (
+            <div key={item.id} style={{ background: C.surface, borderRadius: 18, border: `1px solid ${C.border}`, padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 11, background: C.goldLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="star" size={16} color={C.gold} strokeWidth={1.8} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: SERIF, color: C.text, fontSize: 18, fontWeight: 600 }}>{item.title}</div>
+                  <div style={{ fontFamily: SANS, color: C.textLight, fontSize: 12, marginTop: 2 }}>{item.deadline || 'Deadline TBD'}</div>
+                  <div style={{ fontFamily: SANS, color: C.textMid, fontSize: 12, marginTop: 6 }}>{item.action || item.summary || 'No action configured.'}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => draftEmail(item)}
+                  disabled={busy}
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    borderRadius: 10,
+                    background: C.gold,
+                    color: 'white',
+                    padding: '9px 10px',
+                    fontFamily: SANS,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Draft email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => sendEmail(item)}
+                  disabled={busy}
+                  style={{
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 10,
+                    background: C.surface,
+                    color: C.textMid,
+                    padding: '9px 10px',
+                    fontFamily: SANS,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {eventCards.map((item) => (
+            <div key={item.id} style={{ background: C.surface, borderRadius: 18, border: `1px solid ${C.border}`, padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 11, background: C.greenSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="calendar" size={16} color={C.green} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, color: C.text }}>{item.title}</div>
+                  <div style={{ fontFamily: SANS, fontSize: 12, color: C.textLight }}>
+                    {toDateString(item.date)} {item.time ? `· ${item.time}` : ''} {item.location ? `· ${item.location}` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div
@@ -426,46 +344,156 @@ export function TrackTab({ flowState, onNudge }) {
         >
           Missed
         </div>
-        <div style={{ background: C.surface, borderRadius: 16, border: `1px dashed ${C.border}`, padding: '14px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {!missedCards.length && (
+            <div style={{ background: C.surface, borderRadius: 16, border: `1px dashed ${C.border}`, padding: '14px 14px', fontFamily: SANS, fontSize: 12, color: C.textLight }}>
+              Missed events and opportunities will appear here with new similar matches.
+            </div>
+          )}
+          {missedCards.map((missed) => (
+            <div key={missed.id} style={{ background: C.surface, borderRadius: 16, border: `1px dashed ${C.border}`, padding: '14px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 9, background: '#fdf6e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="clock" size={16} color={C.gold} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.text }}>{missed.title}</div>
+                  <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight }}>Closed {toDateString(missed.closedLabel, missed.closedLabel)}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(missed.similar || []).map((suggestion) => (
+                  <div key={suggestion.id} style={{ padding: '10px 12px', background: C.greenSoft, borderRadius: 10, border: `1px solid ${C.green}40` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Icon name="sparkles" size={13} color={C.green} />
+                        <div>
+                          <div style={{ fontFamily: SANS, fontSize: 12, fontWeight: 700, color: C.green }}>{suggestion.title}</div>
+                          <div style={{ fontFamily: SANS, fontSize: 11, color: '#285f3b', marginTop: 1 }}>{suggestion.opens}</div>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          borderRadius: 999,
+                          background: 'white',
+                          border: `1px solid ${C.green}55`,
+                          padding: '3px 8px',
+                          fontFamily: SANS,
+                          fontSize: 11,
+                          color: C.green,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {suggestion.matchPercent}% match
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => runSearch(missed.title)}
+                disabled={busy}
+                style={{
+                  marginTop: 10,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 10,
+                  background: C.surface,
+                  color: C.textMid,
+                  padding: '8px 10px',
+                  fontFamily: SANS,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Search web for more similar
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {(emailDraftResult || searchResult) && (
+          <div style={{ marginTop: 12, background: C.surface, borderRadius: 12, border: `1px solid ${C.border}`, padding: '10px 11px' }}>
+            {emailDraftResult && (
+              <p style={{ margin: 0, fontFamily: SANS, fontSize: 12, color: C.textMid }}>
+                <strong style={{ color: C.text }}>Email:</strong> {emailDraftResult}
+              </p>
+            )}
+            {searchResult && (
+              <p style={{ margin: emailDraftResult ? '6px 0 0' : 0, fontFamily: SANS, fontSize: 12, color: C.textMid }}>
+                <strong style={{ color: C.text }}>Search:</strong> {searchResult}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <Sheet open={calendarOpen} onClose={() => setCalendarOpen(false)}>
+        <div>
+          <div style={{ fontFamily: SERIF, fontSize: 22, color: C.text, fontWeight: 600, marginBottom: 8 }}>Calendar</div>
+          <div style={{ fontFamily: SANS, fontSize: 12, color: C.textLight, marginBottom: 14 }}>In-app calendar + ICS support</div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={exportIcs}
+              disabled={!calendarItems.length}
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 9,
-                background: '#fdf6e6',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                flex: 1,
+                border: 'none',
+                borderRadius: 10,
+                background: calendarItems.length ? C.green : C.greenSoft,
+                color: calendarItems.length ? 'white' : C.textLight,
+                padding: '10px 11px',
+                fontFamily: SANS,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: calendarItems.length ? 'pointer' : 'default',
               }}
             >
-              <Icon name="clock" size={16} color={C.gold} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.text }}>ALES Undergraduate Award</div>
-              <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight }}>94% match · Closed Jan 15</div>
-            </div>
+              Export ICS
+            </button>
+            <label
+              htmlFor="ics-import"
+              style={{
+                flex: 1,
+                border: `1px solid ${C.border}`,
+                borderRadius: 10,
+                background: C.surface,
+                color: C.textMid,
+                padding: '10px 11px',
+                fontFamily: SANS,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                textAlign: 'center',
+              }}
+            >
+              Import ICS
+            </label>
+            <input id="ics-import" type="file" accept=".ics,text/calendar" onChange={onImportIcs} style={{ display: 'none' }} />
           </div>
-          <div
-            style={{
-              padding: '9px 12px',
-              background: C.greenSoft,
-              borderRadius: 10,
-              fontFamily: SANS,
-              fontSize: 12,
-              color: C.green,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <Icon name="sparkles" size={13} color={C.green} />
-            <span>
-              Similar: <strong>FGSR Travel Award</strong> opens Jun 1
-            </span>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {!sortedCalendar.length && (
+              <div style={{ borderRadius: 10, border: `1px dashed ${C.border}`, padding: '10px 11px', fontFamily: SANS, fontSize: 12, color: C.textLight }}>
+                No calendar events yet. Accept an upcoming event from Create.
+              </div>
+            )}
+            {sortedCalendar.map((event) => (
+              <div key={event.id} style={{ borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, padding: '10px 11px' }}>
+                <div style={{ fontFamily: SANS, fontSize: 13, color: C.text, fontWeight: 700 }}>{event.title}</div>
+                <div style={{ fontFamily: SANS, fontSize: 11, color: C.textLight, marginTop: 2 }}>
+                  {toDateString(event.date)} {event.time ? `· ${event.time}` : ''} {event.location ? `· ${event.location}` : ''}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </Sheet>
     </div>
   );
 }
