@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Beartracks AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<template id="__bundler_thumbnail" data-bg-color="#0e3a26">
+  <svg viewBox="0 0 430 932" xmlns="http://www.w3.org/2000/svg">
+    <!-- Phone shell -->
+    <rect x="0" y="0" width="430" height="932" fill="#0e3a26"/>
+    <!-- Screen -->
+    <rect x="20" y="20" width="390" height="892" rx="36" fill="#fafbf9"/>
+    <!-- Header bar -->
+    <rect x="20" y="20" width="390" height="70" rx="20" fill="#ffffff"/>
+    <text x="40" y="62" fontFamily="Georgia,serif" fontSize="28" fontWeight="600" fill="#0e1a13">Ask</text>
+    <!-- Chat bubble -->
+    <rect x="40" y="110" width="200" height="44" rx="16" fill="#ffffff" stroke="#eaeee8" strokeWidth="1"/>
+    <circle cx="56" cy="132" r="10" fill="#0e3a26"/>
+    <rect x="72" y="126" width="120" height="12" rx="6" fill="#eaeee8"/>
+    <!-- Input bar -->
+    <rect x="40" y="800" width="350" height="50" rx="25" fill="#ffffff" stroke="#eaeee8" strokeWidth="1.5"/>
+    <circle cx="370" cy="825" r="18" fill="#1c5d3e"/>
+    <!-- Bottom nav -->
+    <rect x="20" y="858" width="390" height="54" rx="0" fill="#ffffff"/>
+    <rect x="20" y="858" width="390" height="1" fill="#eaeee8"/>
+    <!-- Nav dots -->
+    <circle cx="108" cy="882" r="12" fill="#eaeee8"/>
+    <circle cx="215" cy="882" r="12" fill="#1c5d3e"/>
+    <circle cx="322" cy="882" r="12" fill="#eaeee8"/>
+    <!-- Gold accent -->
+    <rect x="192" y="160" width="46" height="8" rx="4" fill="#d4a72c" opacity="0.6"/>
+  </svg>
+</template>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%;overflow:hidden;background:#0c1410;font-family:'Inter',sans-serif}
+::-webkit-scrollbar{display:none}
+button{font-family:inherit}
+input,textarea{font-family:inherit}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:2px;background:#e8ebe6;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#1c5d3e;cursor:pointer;box-shadow:0 2px 8px rgba(28,93,62,.4)}
+@keyframes pulseRing{0%{transform:scale(.8);opacity:.5}100%{transform:scale(2.2);opacity:0}}
+@keyframes typingDot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-4px);opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes nudgePop{0%{transform:scale(.92) translateY(14px);opacity:0}60%{transform:scale(1.02)}100%{transform:scale(1) translateY(0);opacity:1}}
+@keyframes scanLine{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+@keyframes drawPath{from{stroke-dashoffset:300}to{stroke-dashoffset:0}}
+@keyframes shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+.shimmer{background:linear-gradient(90deg,#eef1ec 0%,#f5f7f4 50%,#eef1ec 100%);background-size:200px 100%;animation:shimmer 1.4s linear infinite}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+// ─── TOKENS ────────────────────────────────────────────
+const C={
+  green:'#1c5d3e', greenDeep:'#0e3a26', greenLight:'#e8f1ec', greenSoft:'#f3f7f4',
+  gold:'#d4a72c', goldLight:'#faf3dd',
+  surface:'#ffffff', bg:'#fafbf9', border:'#eaeee8',
+  text:'#0e1a13', textMid:'#4a554d', textLight:'#8a948c',
+  err:'#b8442b', errLight:'#fbece8',
+};
+const SERIF="'Fraunces',Georgia,serif";
+const SANS="'Inter',sans-serif";
+
+// ─── ICONS (line, no emoji) ────────────────────────────
+const Icon = ({name,size=20,color='currentColor',strokeWidth=1.6}) => {
+  const p={width:size,height:size,viewBox:'0 0 24 24',fill:'none',stroke:color,strokeWidth,strokeLinecap:'round',strokeLinejoin:'round'};
+  switch(name){
+    case 'send': return <svg {...p}><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>;
+    case 'mic': return <svg {...p}><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0014 0v-2"/><path d="M12 19v3"/></svg>;
+    case 'plus': return <svg {...p}><path d="M12 5v14M5 12h14"/></svg>;
+    case 'check': return <svg {...p}><path d="M20 6L9 17l-5-5"/></svg>;
+    case 'x': return <svg {...p}><path d="M18 6L6 18M6 6l12 12"/></svg>;
+    case 'arrow-right': return <svg {...p}><path d="M5 12h14M13 6l6 6-6 6"/></svg>;
+    case 'arrow-up': return <svg {...p}><path d="M12 19V5M5 12l7-7 7 7"/></svg>;
+    case 'arrow-down': return <svg {...p}><path d="M12 5v14M5 12l7 7 7-7"/></svg>;
+    case 'pin': return <svg {...p}><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+    case 'calendar': return <svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>;
+    case 'clock': return <svg {...p}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>;
+    case 'volume-x': return <svg {...p}><path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/></svg>;
+    case 'users': return <svg {...p}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>;
+    case 'star': return <svg {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+    case 'lock': return <svg {...p}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>;
+    case 'sparkles': return <svg {...p}><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2 2M16.4 16.4l2 2M5.6 18.4l2-2M16.4 7.6l2-2"/></svg>;
+    case 'chat': return <svg {...p}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>;
+    case 'grid': return <svg {...p}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>;
+    case 'user': return <svg {...p}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+    case 'bell': return <svg {...p}><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>;
+    case 'shield': return <svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+    case 'trash': return <svg {...p}><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>;
+    case 'link': return <svg {...p}><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>;
+    case 'flag': return <svg {...p}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22V15"/></svg>;
+    case 'target': return <svg {...p}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
+    case 'book': return <svg {...p}><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>;
+    case 'briefcase': return <svg {...p}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>;
+    case 'eye': return <svg {...p}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>;
+    case 'image': return <svg {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>;
+    case 'menu': return <svg {...p}><path d="M3 12h18M3 6h18M3 18h18"/></svg>;
+    case 'wand': return <svg {...p}><path d="M15 4l4 4-13 13H2v-4z"/><path d="M14 5l5 5"/></svg>;
+    case 'circle': return <svg {...p}><circle cx="12" cy="12" r="10"/></svg>;
+    case 'circle-fill': return <svg {...p} fill={color}><circle cx="12" cy="12" r="6" stroke="none"/></svg>;
+    case 'home': return <svg {...p}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>;
+    case 'wallet': return <svg {...p}><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 100 4h4v-4z"/></svg>;
+    case 'heart': return <svg {...p}><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>;
+    case 'compass': return <svg {...p}><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>;
+    case 'zap': return <svg {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+    case 'camera': return <svg {...p}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>;
+    case 'chevron-right': return <svg {...p}><path d="M9 18l6-6-6-6"/></svg>;
+    case 'chevron-down': return <svg {...p}><path d="M6 9l6 6 6-6"/></svg>;
+    case 'sliders': return <svg {...p}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>;
+    default: return null;
+  }
+};
+
+// ─── ATOMS ─────────────────────────────────────────────
+const StatusBar = () => (
+  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 22px 4px',fontSize:13,fontWeight:600,color:C.text,fontFamily:SANS}}>
+    <span>9:41</span>
+    <div style={{display:'flex',gap:6,alignItems:'center'}}>
+      <svg width="16" height="11" viewBox="0 0 16 12"><rect x="0" y="4" width="3" height="8" rx="1" fill={C.text}/><rect x="4.5" y="2.5" width="3" height="9.5" rx="1" fill={C.text}/><rect x="9" y=".5" width="3" height="11.5" rx="1" fill={C.text}/><rect x="13.5" y="0" width="2.5" height="12" rx="1" fill={C.text}/></svg>
+      <svg width="14" height="11" viewBox="0 0 20 14"><path d="M10 2.5C13.2 2.5 16.1 3.8 18.2 5.9L20 4.1C17.4 1.5 13.9 0 10 0 6.1 0 2.6 1.5 0 4.1L1.8 5.9C3.9 3.8 6.8 2.5 10 2.5Z" fill={C.text}/><path d="M10 7C12 7 13.8 7.8 15.2 9.1L17 7.3C15.1 5.5 12.7 4.5 10 4.5 7.3 4.5 4.9 5.5 3 7.3L4.8 9.1C6.2 7.8 8 7 10 7Z" fill={C.text}/><circle cx="10" cy="12" r="2" fill={C.text}/></svg>
+      <div style={{width:24,height:11,border:`1.5px solid ${C.text}`,borderRadius:3,padding:'1px 1.5px',display:'flex',alignItems:'center'}}>
+        <div style={{width:'78%',height:'100%',background:C.text,borderRadius:1.5}}></div>
+      </div>
+    </div>
+  </div>
+);
+
+const PulsingDot = ({color=C.green,size=8}) => (
+  <div style={{position:'relative',width:size,height:size,flexShrink:0}}>
+    <div style={{width:size,height:size,borderRadius:'50%',background:color}}></div>
+    <div style={{position:'absolute',inset:-3,borderRadius:'50%',background:color,opacity:.3,animation:'pulseRing 1.6s ease infinite'}}></div>
+  </div>
+);
+
+const Chip = ({icon,label,onTap,small=false,active=false,color=C.green}) => (
+  <button onClick={onTap} style={{
+    display:'inline-flex',alignItems:'center',gap:6,
+    background:active?color:C.surface,color:active?'white':C.text,
+    border:`1px solid ${active?color:C.border}`,
+    borderRadius:18,padding:small?'5px 11px':'7px 13px',
+    fontSize:small?12:13,fontWeight:500,cursor:onTap?'pointer':'default',
+    fontFamily:SANS,userSelect:'none',transition:'all .15s',
+  }}>
+    {icon && <Icon name={icon} size={small?12:14} color={active?'white':C.textMid} strokeWidth={1.7}/>}
+    <span>{label}</span>
+  </button>
+);
+
+// ─── RADAR CHART ───────────────────────────────────────
+const RadarChart = ({data,size=240}) => {
+  // data: [{label, value 0-100, color}]
+  const cx=size/2, cy=size/2, r=size*0.3;
+  const n=data.length;
+  const angle = (i) => -Math.PI/2 + (2*Math.PI*i)/n;
+  const point = (i,frac) => ({
+    x: cx + Math.cos(angle(i))*r*frac,
+    y: cy + Math.sin(angle(i))*r*frac,
+  });
+  const labelPoint = (i) => ({
+    x: cx + Math.cos(angle(i))*(r+22),
+    y: cy + Math.sin(angle(i))*(r+22),
+  });
+  const valuePath = data.map((d,i)=>{
+    const p = point(i, d.value/100);
+    return `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+  }).join(' ')+'Z';
+  const grids=[0.25,0.5,0.75,1.0];
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:'block',margin:'0 auto',overflow:'visible'}}>
+      {/* Grid pentagons */}
+      {grids.map((g,gi)=>{
+        const path = data.map((_,i)=>{
+          const p=point(i,g);
+          return `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+        }).join(' ')+'Z';
+        return <path key={gi} d={path} fill="none" stroke={C.border} strokeWidth={1}/>;
+      })}
+      {/* Spokes */}
+      {data.map((_,i)=>{
+        const p=point(i,1);
+        return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke={C.border} strokeWidth={1}/>;
+      })}
+      {/* Filled value area */}
+      <path d={valuePath} fill={C.green+'33'} stroke={C.green} strokeWidth={2} strokeLinejoin="round"/>
+      {/* Value points */}
+      {data.map((d,i)=>{
+        const p=point(i, d.value/100);
+        return <circle key={i} cx={p.x} cy={p.y} r={4} fill={C.green} stroke={C.surface} strokeWidth={2}/>;
+      })}
+      {/* Labels */}
+      {data.map((d,i)=>{
+        const lp=labelPoint(i);
+        const ang=angle(i);
+        const anchor = Math.cos(ang)<-0.3?'end':Math.cos(ang)>0.3?'start':'middle';
+        return (
+          <g key={i}>
+            <text x={lp.x} y={lp.y-4} textAnchor={anchor} fontFamily={SANS} fontSize="11" fontWeight="600" fill={C.text}>{d.label}</text>
+            <text x={lp.x} y={lp.y+9} textAnchor={anchor} fontFamily={SANS} fontSize="10" fill={C.textLight}>{d.value}%</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+// ─── BOTTOM SHEET ──────────────────────────────────────
+const Sheet = ({open,onClose,children,height='auto'}) => (
+  <div onClick={e=>{if(e.target===e.currentTarget)onClose()}} style={{
+    position:'absolute',inset:0,zIndex:300,
+    background:open?'rgba(14,26,19,.4)':'transparent',
+    transition:'background .3s',display:'flex',flexDirection:'column',justifyContent:'flex-end',
+    pointerEvents:open?'all':'none',
+  }}>
+    <div style={{
+      background:C.surface,borderRadius:'24px 24px 0 0',padding:'14px 20px 36px',
+      transform:open?'translateY(0)':'translateY(100%)',
+      transition:'transform .35s cubic-bezier(.32,.72,0,1)',
+      boxShadow:'0 -8px 40px rgba(0,0,0,.12)',maxHeight:'80%',overflow:'auto',
+    }}>
+      <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:'0 auto 18px'}}></div>
+      {children}
+    </div>
+  </div>
+);
+
+// ─── BOTTOM NAV ────────────────────────────────────────
+const NAV=[
+  {id:'track',label:'Track',icon:'grid'},
+  {id:'ask',label:'Ask',icon:'chat'},
+  {id:'create',label:'Create',icon:'plus'},
+  {id:'profile',label:'Profile',icon:'user'},
+];
+const BottomNav = ({active,onChange}) => (
+  <div style={{
+    position:'absolute',bottom:0,left:0,right:0,
+    background:'rgba(255,255,255,.96)',backdropFilter:'blur(20px)',
+    borderTop:`1px solid ${C.border}`,
+    display:'flex',justifyContent:'space-around',alignItems:'center',
+    padding:'10px 0 26px',zIndex:100,
+  }}>
+    {NAV.map(t=>{
+      const a=active===t.id;
+      return (
+        <button key={t.id} onClick={()=>onChange(t.id)} style={{
+          display:'flex',flexDirection:'column',alignItems:'center',gap:4,
+          background:'none',border:'none',cursor:'pointer',padding:'4px 12px',
+          color:a?C.green:C.textLight,transition:'color .2s',
+        }}>
+          <div style={{position:'relative'}}>
+            <Icon name={t.icon} size={22} color={a?C.green:C.textLight} strokeWidth={a?2:1.7}/>
+            {t.id==='ask' && a && <div style={{position:'absolute',top:-2,right:-3,width:6,height:6,borderRadius:'50%',background:C.gold}}></div>}
+          </div>
+          <span style={{fontSize:10.5,fontWeight:a?700:500,fontFamily:SANS,letterSpacing:'0.01em'}}>{t.label}</span>
+        </button>
+      );
+    })}
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════
+// ASK TAB
+// ═══════════════════════════════════════════════════════
+const AskTab = ({flowState,onAdvance}) => {
+  const [msgs,setMsgs]=React.useState([
+    {role:'agent',text:"Morning, Alex. What do you need?",time:'9:41'},
+  ]);
+  const [input,setInput]=React.useState('');
+  const [typing,setTyping]=React.useState(false);
+  const [sheet,setSheet]=React.useState(null);
+  const [step,setStep]=React.useState(0);
+  const endRef=React.useRef(null);
+  const inputRef=React.useRef(null);
+
+  React.useEffect(()=>{
+    if(endRef.current) endRef.current.scrollIntoView({block:'end',behavior:'smooth'});
+  },[msgs,typing]);
+
+  React.useEffect(()=>{
+    if(flowState==='nudge'){
+      setTimeout(()=>{
+        setMsgs(p=>[...p,{
+          role:'agent',time:'now',
+          text:"Got it. CAB 2-690 just opened up tomorrow 1–5 PM. Whiteboard's there. Remedy Café is 180m away.",
+          rich:{type:'roomCard',room:'CAB 2-690',time:'Tue · 1:00–5:00 PM',amenities:['Quiet zone','Whiteboard','Window seat']}
+        },{
+          role:'agent',time:'now',
+          text:"I'm tagging this room as a North Campus preference for next time. Sound right?",
+          inline:true,
+        }]);
+      },200);
+    }
+  },[flowState]);
+
+  const reply = (m,delay=900) => {
+    setTyping(true);
+    setTimeout(()=>{ setTyping(false); setMsgs(p=>[...p,{role:'agent',time:'now',...m}]); },delay);
+  };
+
+  const send = (override) => {
+    const text = override || input.trim();
+    if(!text) return;
+    setMsgs(p=>[...p,{role:'user',text,time:'now'}]);
+    setInput('');
+    if(step===0){
+      setStep(1);
+      reply({text:"On it — North Campus, tomorrow afternoon. Two quick things first."},950);
+      setTimeout(()=>setSheet('duration'),1900);
+    }
+  };
+
+  const onDuration = (v) => {
+    setSheet(null);
+    setMsgs(p=>[...p,{role:'user',text:v,time:'now',compact:true}]);
+    setStep(2);
+    reply({text:`${v}, noted. Solo room, or quiet shared space?`},850);
+    setTimeout(()=>setSheet('roomtype'),1800);
+  };
+
+  const onRoomType = (v) => {
+    setSheet(null);
+    setMsgs(p=>[...p,{role:'user',text:v,time:'now',compact:true}]);
+    setStep(3);
+    reply({text:"Solid. I'll deploy the agent — confirm to start tracking.",confirmBtn:true},900);
+  };
+
+  const confirm = () => {
+    setMsgs(p=>[...p,{role:'agent',text:"Agent live. Scanning room.ualberta.ca + UAIMS now.",time:'now',scanning:true}]);
+    setTimeout(()=>onAdvance(),700);
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg,position:'relative'}}>
+      {/* Header */}
+      <div style={{padding:'14px 20px 12px',background:C.surface,borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontFamily:SERIF,fontSize:24,fontWeight:500,color:C.text,letterSpacing:'-0.01em'}}>Ask</div>
+          <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,marginTop:1}}>
+            {flowState==='nudge'?'1 match found':'Beartracks · UAlberta'}
+          </div>
+        </div>
+        {(flowState==='track'||flowState==='nudge') && (
+          <div style={{display:'flex',alignItems:'center',gap:6,background:C.greenLight,padding:'5px 10px',borderRadius:11}}>
+            <PulsingDot size={6}/>
+            <span style={{fontSize:11,fontWeight:700,color:C.green,fontFamily:SANS}}>1 LIVE</span>
+          </div>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div style={{flex:1,overflowY:'auto',padding:'18px 16px 130px'}}>
+        {msgs.map((m,i)=><Bubble key={i} m={m} idx={i} total={msgs.length} step={step} onConfirm={confirm}/>)}
+        {typing && <Typing/>}
+        <div ref={endRef}/>
+      </div>
+
+      {/* Inline composer + quick chips on first load */}
+      {step===0 && msgs.length===1 && !typing && (
+        <div style={{padding:'4px 16px 0',marginTop:-8,marginBottom:18,animation:'fadeUp .35s ease'}}>
+          <div style={{
+            background:C.surface,border:`1.5px solid ${input.trim()?C.green:C.border}`,
+            borderRadius:18,padding:'4px 6px 4px 16px',display:'flex',alignItems:'center',gap:6,
+            transition:'border-color .2s',marginLeft:30,
+            boxShadow:input.trim()?`0 4px 16px ${C.green}22`:'none',
+          }}>
+            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} autoFocus
+              placeholder="Type a request…"
+              style={{flex:1,border:'none',background:'none',padding:'10px 0',fontSize:14,fontFamily:SANS,color:C.text,outline:'none'}}/>
+            <button onClick={()=>send()} style={{
+              width:32,height:32,borderRadius:'50%',background:input.trim()?C.green:C.greenSoft,border:'none',cursor:'pointer',
+              display:'flex',alignItems:'center',justifyContent:'center',transition:'background .2s',
+            }}>
+              <Icon name="arrow-up" size={15} color={input.trim()?'white':C.textLight} strokeWidth={2.4}/>
+            </button>
+          </div>
+          <div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:12,marginLeft:30}}>
+            {[
+              {label:'Find a quiet study room',icon:'book'},
+              {label:'My schedule today',icon:'calendar'},
+              {label:'Research grants',icon:'sparkles'},
+            ].map(q=>(
+              <Chip key={q.label} icon={q.icon} label={q.label} onTap={()=>send(q.label)} small/>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input bar - prominent text box */}
+      <div style={{
+        position:'absolute',bottom:0,left:0,right:0,zIndex:50,
+        background:'linear-gradient(180deg, rgba(250,251,249,0) 0%, rgba(250,251,249,.95) 25%, rgba(250,251,249,1) 100%)',
+        padding:'14px 14px 22px',
+      }}>
+        <div style={{
+          background:C.surface,border:`1.5px solid ${input.trim()?C.green:C.border}`,
+          borderRadius:24,padding:'4px 6px 4px 18px',display:'flex',alignItems:'center',gap:8,
+          transition:'border-color .2s',boxShadow:input.trim()?`0 4px 16px ${C.green}22`:'0 1px 4px rgba(0,0,0,.04)',
+        }}>
+          <input ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()}
+            placeholder="Message Beartracks…"
+            style={{flex:1,border:'none',background:'none',padding:'13px 0',fontSize:15,fontFamily:SANS,color:C.text,outline:'none'}}/>
+          <button style={{background:'none',border:'none',cursor:'pointer',padding:8,display:'flex',color:C.textLight}}>
+            <Icon name="mic" size={20}/>
+          </button>
+          <button onClick={()=>send()} style={{
+            width:40,height:40,borderRadius:'50%',background:input.trim()?C.green:C.greenSoft,border:'none',cursor:'pointer',
+            display:'flex',alignItems:'center',justifyContent:'center',transition:'background .2s',
+          }}>
+            <Icon name="arrow-up" size={18} color={input.trim()?'white':C.textLight} strokeWidth={2.2}/>
+          </button>
+        </div>
+      </div>
+
+      {/* Sheets */}
+      <Sheet open={sheet==='duration'} onClose={()=>setSheet(null)}>
+        <div style={{fontFamily:SERIF,fontSize:22,fontWeight:500,color:C.text,marginBottom:4}}>How long do you need it?</div>
+        <div style={{fontFamily:SANS,fontSize:13,color:C.textLight,marginBottom:20}}>I'll narrow availability windows.</div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {[
+            {l:'1–2 hours',s:'Quick session',ic:'clock'},
+            {l:'2–4 hours',s:'Afternoon block',ic:'clock'},
+            {l:'4+ hours',s:'All day',ic:'clock'},
+            {l:'Flexible',s:'Show all options',ic:'sliders'},
+          ].map(o=>(
+            <button key={o.l} onClick={()=>onDuration(o.l)} className="hover-row" style={{
+              display:'flex',alignItems:'center',gap:14,padding:'14px 16px',
+              background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:14,cursor:'pointer',transition:'all .15s',
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=C.green;e.currentTarget.style.background=C.greenSoft}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background=C.bg}}>
+              <div style={{width:36,height:36,borderRadius:10,background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',color:C.green}}>
+                <Icon name={o.ic} size={18}/>
+              </div>
+              <div style={{flex:1,textAlign:'left'}}>
+                <div style={{fontFamily:SANS,fontSize:15,fontWeight:600,color:C.text}}>{o.l}</div>
+                <div style={{fontFamily:SANS,fontSize:12,color:C.textLight}}>{o.s}</div>
+              </div>
+              <Icon name="chevron-right" size={16} color={C.textLight}/>
+            </button>
+          ))}
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet==='roomtype'} onClose={()=>setSheet(null)}>
+        <div style={{fontFamily:SERIF,fontSize:22,fontWeight:500,color:C.text,marginBottom:4}}>Room type?</div>
+        <div style={{fontFamily:SANS,fontSize:13,color:C.textLight,marginBottom:20}}>Setting this as a Dealbreaker.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+          {[
+            {l:'Solo only',s:'Private',ic:'user'},
+            {l:'Quiet shared',s:'Low traffic',ic:'volume-x'},
+            {l:'Either',s:'Show all',ic:'users'},
+          ].map(o=>(
+            <button key={o.l} onClick={()=>onRoomType(o.l)} style={{
+              display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'18px 8px',
+              background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:16,cursor:'pointer',transition:'all .15s',
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=C.green;e.currentTarget.style.background=C.greenSoft}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background=C.bg}}>
+              <div style={{width:40,height:40,borderRadius:'50%',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',color:C.green}}>
+                <Icon name={o.ic} size={20}/>
+              </div>
+              <div style={{fontFamily:SANS,fontSize:13,fontWeight:600,color:C.text,textAlign:'center'}}>{o.l}</div>
+              <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>{o.s}</div>
+            </button>
+          ))}
+        </div>
+      </Sheet>
+    </div>
+  );
+};
+
+const Bubble = ({m,onConfirm}) => {
+  if(m.role==='user') return (
+    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14,animation:'fadeUp .3s ease'}}>
+      <div style={{
+        maxWidth:'78%',background:C.green,color:'white',
+        borderRadius:'20px 20px 6px 20px',padding:m.compact?'8px 14px':'10px 14px',
+        fontSize:14,fontFamily:SANS,lineHeight:1.5,
+      }}>{m.text}</div>
+    </div>
+  );
+
+  return (
+    <div style={{marginBottom:14,animation:'fadeUp .3s ease'}}>
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
+        <div style={{width:24,height:24,borderRadius:'50%',background:C.greenDeep,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <span style={{fontSize:11,color:C.gold,fontWeight:800,fontFamily:SERIF}}>B</span>
+        </div>
+        <span style={{fontSize:11,color:C.textLight,fontFamily:SANS,fontWeight:500}}>Beartracks · {m.time}</span>
+      </div>
+      <div style={{
+        maxWidth:'85%',background:m.inline?'transparent':C.surface,
+        borderRadius:m.inline?0:'4px 18px 18px 18px',
+        padding:m.inline?'2px 0':'12px 16px',
+        border:m.inline?'none':`1px solid ${C.border}`,
+        boxShadow:m.inline?'none':'0 1px 3px rgba(0,0,0,.04)',
+      }}>
+        <p style={{margin:0,fontSize:14,fontFamily:SANS,color:m.inline?C.textMid:C.text,lineHeight:1.55,fontStyle:m.inline?'italic':'normal'}}>
+          {m.inline && <span style={{color:C.gold,marginRight:6,fontStyle:'normal'}}>◆</span>}
+          {m.text}
+        </p>
+
+        {m.scanning && (
+          <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:C.greenSoft,borderRadius:10}}>
+            <PulsingDot size={6}/>
+            <span style={{fontSize:12,fontFamily:SANS,color:C.green,fontWeight:600}}>Scanning room.ualberta.ca</span>
+          </div>
+        )}
+
+        {m.rich?.type==='roomCard' && (
+          <div style={{marginTop:12,padding:14,background:C.greenSoft,borderRadius:14,border:`1px solid ${C.green}33`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+              <div>
+                <div style={{fontFamily:SERIF,fontSize:18,fontWeight:600,color:C.text}}>{m.rich.room}</div>
+                <div style={{fontFamily:SANS,fontSize:12,color:C.textMid,marginTop:2}}>Cameron Library · 2nd floor</div>
+              </div>
+              <div style={{padding:'3px 9px',borderRadius:11,background:C.green,fontFamily:SANS,fontSize:10,fontWeight:700,color:'white',letterSpacing:'.04em'}}>OPEN</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:6,fontFamily:SANS,fontSize:13,color:C.text,marginBottom:10}}>
+              <Icon name="clock" size={14} color={C.green}/>{m.rich.time}
+            </div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+              {m.rich.amenities.map(a=><div key={a} style={{padding:'4px 10px',background:'white',borderRadius:11,fontFamily:SANS,fontSize:11,color:C.textMid,border:`1px solid ${C.border}`}}>{a}</div>)}
+            </div>
+            <button style={{
+              width:'100%',background:C.green,color:'white',border:'none',borderRadius:14,
+              padding:'12px',fontFamily:SANS,fontSize:14,fontWeight:700,cursor:'pointer',
+              display:'flex',alignItems:'center',justifyContent:'center',gap:6,
+            }}>
+              <Icon name="check" size={16} strokeWidth={2.4}/>Reserve room
+            </button>
+          </div>
+        )}
+
+        {m.confirmBtn && (
+          <button onClick={onConfirm} style={{
+            marginTop:14,background:C.green,color:'white',border:'none',borderRadius:18,padding:'12px 22px',
+            fontFamily:SANS,fontSize:14,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:8,
+            boxShadow:`0 3px 12px ${C.green}33`,
+          }}>
+            Review parameters <Icon name="arrow-right" size={14} strokeWidth={2.4}/>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const Typing = () => (
+  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+    <div style={{width:24,height:24,borderRadius:'50%',background:C.greenDeep,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <span style={{fontSize:11,color:C.gold,fontWeight:800,fontFamily:SERIF}}>B</span>
+    </div>
+    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'4px 18px 18px 18px',padding:'12px 16px',display:'flex',gap:5}}>
+      {[0,1,2].map(i=><div key={i} style={{width:5,height:5,borderRadius:'50%',background:C.textLight,animation:`typingDot 1.2s ease ${i*0.18}s infinite`}}></div>)}
+    </div>
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════
+// CREATE TAB — 3 classes: Agent / Milestone / Opportunity
+// ═══════════════════════════════════════════════════════
+const CLASSES=[
+  {id:'agent',name:'Agent',sub:'Background search that runs continuously',icon:'sparkles',color:C.green},
+  {id:'milestone',name:'Milestone',sub:'Long-term goal you\'re working toward',icon:'flag',color:'#7a4ec6'},
+  {id:'opportunity',name:'Opportunity',sub:'A specific event, deadline, or application',icon:'star',color:C.gold},
+  {id:'whatif',name:'What-If',sub:'Snap a flyer — find similar events',icon:'image',color:'#c8693a'},
+];
+
+const CreateTab = ({flowState,onDeploy}) => {
+  const [selectedClass,setSelectedClass]=React.useState(flowState==='create'?'agent':null);
+  const [draft,setDraft]=React.useState(flowState==='create');
+  const [db,setDb]=React.useState(flowState==='create'?[
+    {id:'loc',icon:'pin',label:'North Campus',type:'location'},
+    {id:'date',icon:'calendar',label:'Tomorrow',type:'date'},
+    {id:'noise',icon:'volume-x',label:'Quiet zone',type:'amenity'},
+    {id:'time',icon:'clock',label:'12:00–5:00 PM',type:'time'},
+  ]:[]);
+  const [bon,setBon]=React.useState(flowState==='create'?[
+    {id:'wb',icon:'eye',label:'Whiteboard',type:'amenity'},
+    {id:'cof',icon:'compass',label:'Coffee < 5 min',type:'proximity'},
+  ]:[]);
+  const [editChip,setEditChip]=React.useState(null);
+  const [parsing,setParsing]=React.useState(false);
+  const [deploying,setDeploying]=React.useState(false);
+  const [nlInput,setNlInput]=React.useState('');
+
+  React.useEffect(()=>{
+    if(flowState==='create' && !draft){ setSelectedClass('agent'); setDraft(true); }
+  },[flowState]);
+
+  const startNew = (cls) => {
+    setSelectedClass(cls);
+    setNlInput('');
+    setDb([]); setBon([]);
+    setDraft(true);
+  };
+
+  // What-If branch renders the dedicated panel
+  if(draft && selectedClass==='whatif'){
+    return (
+      <div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg}}>
+        <div style={{padding:'14px 20px 12px',background:C.surface,borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={()=>setDraft(false)} style={{background:'none',border:'none',cursor:'pointer',color:C.textMid,padding:4,display:'flex'}}>
+            <Icon name="arrow-right" size={20} style={{transform:'rotate(180deg)'}}/>
+          </button>
+          <div>
+            <div style={{fontFamily:SERIF,fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.01em'}}>What-If</div>
+            <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>Find similar events from a flyer</div>
+          </div>
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'18px 16px 100px'}}>
+          <WhatIfPanel/>
+        </div>
+      </div>
+    );
+  }
+
+  const parse = () => {
+    if(!nlInput.trim()) return;
+    setParsing(true);
+    setTimeout(()=>{
+      setParsing(false);
+      // Generate fake parsed chips based on input
+      setDb([
+        {id:'loc',icon:'pin',label:'North Campus',type:'location'},
+        {id:'date',icon:'calendar',label:'Tomorrow',type:'date'},
+        {id:'noise',icon:'volume-x',label:'Quiet zone',type:'amenity'},
+        {id:'time',icon:'clock',label:'12:00–5:00 PM',type:'time'},
+      ]);
+      setBon([
+        {id:'wb',icon:'eye',label:'Whiteboard',type:'amenity'},
+        {id:'cof',icon:'compass',label:'Coffee < 5 min',type:'proximity'},
+      ]);
+    },1200);
+  };
+
+  const moveChip = (chip,from) => {
+    if(from==='db'){ setDb(p=>p.filter(c=>c.id!==chip.id)); setBon(p=>[...p,chip]); }
+    else { setBon(p=>p.filter(c=>c.id!==chip.id)); setDb(p=>[...p,chip]); }
+    setEditChip(null);
+  };
+  const removeChip = (chip,from) => {
+    if(from==='db') setDb(p=>p.filter(c=>c.id!==chip.id));
+    else setBon(p=>p.filter(c=>c.id!==chip.id));
+    setEditChip(null);
+  };
+
+  const deploy = () => {
+    setDeploying(true);
+    setTimeout(()=>onDeploy(),900);
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg,position:'relative'}}>
+      <div style={{padding:'14px 20px 12px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+        <div style={{fontFamily:SERIF,fontSize:24,fontWeight:500,color:C.text,letterSpacing:'-0.01em'}}>Create</div>
+        <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,marginTop:1}}>Agents · Milestones · Opportunities</div>
+      </div>
+
+      <div style={{flex:1,overflowY:'auto',padding:'16px',paddingBottom:130}}>
+        {!draft && (
+          <div style={{animation:'fadeUp .35s ease'}}>
+            <div style={{fontFamily:SANS,fontSize:11,fontWeight:700,color:C.textMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:12}}>What are you creating?</div>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {CLASSES.map(c=>(
+                <button key={c.id} onClick={()=>startNew(c.id)} style={{
+                  display:'flex',alignItems:'center',gap:14,padding:'18px 18px',background:C.surface,
+                  border:`1.5px solid ${C.border}`,borderRadius:18,cursor:'pointer',transition:'all .18s',textAlign:'left',
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=c.color;e.currentTarget.style.transform='translateY(-1px)'}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.transform='translateY(0)'}}>
+                  <div style={{width:44,height:44,borderRadius:14,background:c.color+'15',display:'flex',alignItems:'center',justifyContent:'center',color:c.color}}>
+                    <Icon name={c.icon} size={22} strokeWidth={1.8}/>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:SERIF,fontSize:18,fontWeight:600,color:C.text}}>{c.name}</div>
+                    <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,marginTop:2}}>{c.sub}</div>
+                  </div>
+                  <Icon name="chevron-right" size={18} color={C.textLight}/>
+                </button>
+              ))}
+            </div>
+
+            {/* Active drafts */}
+            <div style={{marginTop:28,fontFamily:SANS,fontSize:11,fontWeight:700,color:C.textMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:12}}>Recent drafts</div>
+            <div style={{padding:'14px 16px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,display:'flex',alignItems:'center',gap:10,opacity:.7}}>
+              <Icon name="flag" size={18} color="#7a4ec6"/>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:SANS,fontSize:14,fontWeight:600,color:C.text}}>Find Summer Research Position</div>
+                <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>3 parameters · 2d ago</div>
+              </div>
+              <Icon name="chevron-right" size={16} color={C.textLight}/>
+            </div>
+          </div>
+        )}
+
+        {draft && (
+          <div style={{animation:'fadeUp .3s ease'}}>
+            {/* Class header */}
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+              <button onClick={()=>setDraft(false)} style={{background:'none',border:'none',cursor:'pointer',color:C.textMid,padding:4,display:'flex'}}>
+                <Icon name="arrow-right" size={18} style={{transform:'rotate(180deg)'}}/>
+              </button>
+              <div style={{display:'flex',alignItems:'center',gap:8,flex:1}}>
+                {(() => {
+                  const c = CLASSES.find(c=>c.id===selectedClass)||CLASSES[0];
+                  return (
+                    <>
+                      <div style={{width:28,height:28,borderRadius:9,background:c.color+'18',display:'flex',alignItems:'center',justifyContent:'center',color:c.color}}>
+                        <Icon name={c.icon} size={16} strokeWidth={2}/>
+                      </div>
+                      <div style={{fontFamily:SERIF,fontSize:18,fontWeight:600,color:C.text}}>New {c.name}</div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* NL input */}
+            <div style={{
+              background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:16,padding:'12px 14px',marginBottom:18,
+            }}>
+              <textarea value={nlInput} onChange={e=>setNlInput(e.target.value)} placeholder="Describe what you want to track in plain English…"
+                style={{width:'100%',minHeight:54,border:'none',background:'none',resize:'none',
+                  fontSize:14,fontFamily:SANS,color:C.text,outline:'none',lineHeight:1.5}}/>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
+                <button style={{background:'none',border:'none',cursor:'pointer',color:C.textLight,fontSize:12,fontFamily:SANS,display:'flex',alignItems:'center',gap:5,padding:'4px 0'}}>
+                  <Icon name="mic" size={14}/>Voice
+                </button>
+                <button onClick={parse} disabled={!nlInput.trim()} style={{
+                  background:nlInput.trim()?C.green:C.greenSoft,color:nlInput.trim()?'white':C.textLight,
+                  border:'none',borderRadius:12,padding:'8px 16px',fontFamily:SANS,fontSize:13,fontWeight:600,
+                  cursor:nlInput.trim()?'pointer':'default',display:'flex',alignItems:'center',gap:6,
+                }}>
+                  <Icon name="wand" size={14} strokeWidth={2}/>{parsing?'Parsing…':'Parse'}
+                </button>
+              </div>
+            </div>
+
+            {parsing && (
+              <div style={{padding:'40px 0',textAlign:'center'}}>
+                <div style={{fontFamily:SANS,fontSize:13,color:C.textMid,marginBottom:14}}>Reading intent → extracting parameters</div>
+                <div style={{display:'flex',justifyContent:'center',gap:5}}>
+                  {[0,1,2,3,4].map(i=><div key={i} style={{width:6,height:6,borderRadius:'50%',background:C.green,animation:`typingDot 1s ease ${i*0.13}s infinite`}}></div>)}
+                </div>
+              </div>
+            )}
+
+            {!parsing && (db.length>0 || bon.length>0) && (
+              <>
+                {/* Anti-slop banner */}
+                <div style={{display:'flex',gap:8,padding:'10px 12px',background:C.goldLight,borderRadius:12,border:`1px solid ${C.gold}55`,marginBottom:16}}>
+                  <Icon name="sparkles" size={14} color={C.gold} strokeWidth={2}/>
+                  <p style={{margin:0,fontFamily:SANS,fontSize:12,color:'#7a5e1c',lineHeight:1.5}}>
+                    Parsed "quiet" as a Dealbreaker, "whiteboard" as a Bonus. Tap any chip to adjust.
+                  </p>
+                </div>
+
+                <ChipZone title="Dealbreakers" sub="Must match all" lockColor={C.green} chips={db} onTap={c=>setEditChip({...c,zone:'db'})} onAdd={()=>{}}/>
+
+                <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 4px'}}>
+                  <div style={{flex:1,height:1,background:C.border}}></div>
+                  <span style={{fontFamily:SANS,fontSize:10,color:C.textLight,fontWeight:700,letterSpacing:'.12em'}}>AND</span>
+                  <div style={{flex:1,height:1,background:C.border}}></div>
+                </div>
+
+                <ChipZone title="Bonuses" sub="Nice-to-haves, ranked higher" lockColor={C.gold} chips={bon} onTap={c=>setEditChip({...c,zone:'bon'})} onAdd={()=>{}}/>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Deploy bar */}
+      {draft && (db.length>0||bon.length>0) && !parsing && (
+        <div style={{position:'absolute',bottom:74,left:0,right:0,padding:'12px 16px',background:'linear-gradient(180deg, rgba(250,251,249,0) 0%, rgba(250,251,249,1) 30%)'}}>
+          <button onClick={deploy} style={{
+            width:'100%',background:deploying?C.greenDeep:C.green,color:'white',border:'none',borderRadius:18,
+            padding:'15px',fontFamily:SANS,fontSize:15,fontWeight:700,cursor:'pointer',
+            display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+            boxShadow:`0 4px 18px ${C.green}55`,transition:'all .25s',
+            transform:deploying?'scale(.98)':'scale(1)',
+          }}>
+            {deploying ? <><PulsingDot color="white" size={6}/>Deploying agent…</> : <>Deploy agent <Icon name="arrow-right" size={16} strokeWidth={2.4}/></>}
+          </button>
+        </div>
+      )}
+
+      {/* Edit chip sheet */}
+      <Sheet open={!!editChip} onClose={()=>setEditChip(null)}>
+        {editChip && (
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+              <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 14px',background:C.greenSoft,border:`1px solid ${C.green}33`,borderRadius:18}}>
+                <Icon name={editChip.icon} size={14} color={C.green}/>
+                <span style={{fontFamily:SANS,fontSize:14,fontWeight:600,color:C.text}}>{editChip.label}</span>
+              </div>
+              <span style={{fontFamily:SANS,fontSize:12,color:C.textLight}}>in {editChip.zone==='db'?'Dealbreakers':'Bonuses'}</span>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <button onClick={()=>moveChip(editChip,editChip.zone)} style={{padding:'14px 16px',background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:14,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+                <Icon name="arrow-up" size={16} color={C.green}/>
+                <span style={{fontFamily:SANS,fontSize:14,fontWeight:500,color:C.text,flex:1,textAlign:'left'}}>Move to {editChip.zone==='db'?'Bonuses':'Dealbreakers'}</span>
+              </button>
+              <button onClick={()=>removeChip(editChip,editChip.zone)} style={{padding:'14px 16px',background:C.errLight,border:`1.5px solid ${C.err}33`,borderRadius:14,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+                <Icon name="trash" size={16} color={C.err}/>
+                <span style={{fontFamily:SANS,fontSize:14,fontWeight:500,color:C.err,flex:1,textAlign:'left'}}>Remove</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Sheet>
+    </div>
+  );
+};
+
+const ChipZone = ({title,sub,lockColor,chips,onTap}) => (
+  <div style={{background:C.surface,borderRadius:16,border:`1.5px solid ${lockColor}33`,overflow:'hidden'}}>
+    <div style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:8,borderBottom:`1px solid ${C.border}`}}>
+      <Icon name={title==='Dealbreakers'?'lock':'star'} size={14} color={lockColor} strokeWidth={2}/>
+      <div style={{flex:1}}>
+        <div style={{fontFamily:SANS,fontSize:13,fontWeight:700,color:lockColor}}>{title}</div>
+        <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>{sub}</div>
+      </div>
+    </div>
+    <div style={{padding:'12px 14px',display:'flex',flexWrap:'wrap',gap:7,minHeight:54}}>
+      {chips.length===0 ? <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,fontStyle:'italic',padding:'4px 0'}}>None yet</div> :
+        chips.map(c=><Chip key={c.id} icon={c.icon} label={c.label} onTap={()=>onTap(c)} small/>)
+      }
+    </div>
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════
+// TRACK TAB
+// ═══════════════════════════════════════════════════════
+const TrackTab = ({flowState,onNudge}) => {
+  const [scanProgress,setScanProgress]=React.useState(0);
+  const [scanStage,setScanStage]=React.useState(0); // 0:scanning 1:filtering 2:matching 3:found
+  const [whatIfOpen,setWhatIfOpen]=React.useState(false);
+  const nudged=React.useRef(false);
+
+  const stageNames=['Scanning','Filtering','Matching','Match found'];
+  const stageDetails=['Crawling room.ualberta.ca','Applying dealbreakers','Ranking by bonuses','CAB 2-690 available'];
+
+  React.useEffect(()=>{
+    if(flowState!=='track'){ setScanProgress(0); setScanStage(0); return; }
+    let v=0;
+    const iv=setInterval(()=>{
+      v += Math.random()*5+2;
+      if(v>=100){
+        v=100; clearInterval(iv); setScanStage(3);
+        if(!nudged.current){ nudged.current=true; setTimeout(()=>onNudge&&onNudge(),900); }
+      } else if(v>=66) setScanStage(2);
+      else if(v>=33) setScanStage(1);
+      setScanProgress(Math.min(v,100));
+    },350);
+    return ()=>clearInterval(iv);
+  },[flowState]);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg}}>
+      <div style={{padding:'14px 20px 12px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+        <div>
+          <div style={{fontFamily:SERIF,fontSize:24,fontWeight:500,color:C.text,letterSpacing:'-0.01em'}}>Track</div>
+          <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,marginTop:1}}>
+            {flowState==='track'?'3 active · 1 scanning':'2 active'}
+          </div>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none',padding:'14px 16px 100px'}}>
+        {/* Engagement Radar */}
+        <div style={{background:C.surface,borderRadius:18,border:`1px solid ${C.border}`,padding:'16px 16px 14px',marginBottom:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+            <div>
+              <div style={{fontFamily:SANS,fontSize:11,fontWeight:700,color:C.textMid,letterSpacing:'.08em',textTransform:'uppercase'}}>Engagement Balance</div>
+              <div style={{fontFamily:SERIF,fontSize:18,fontWeight:600,color:C.text,marginTop:2}}>This week</div>
+            </div>
+            <div style={{padding:'3px 9px',borderRadius:11,background:C.errLight,color:C.err,fontFamily:SANS,fontSize:10,fontWeight:700,letterSpacing:'.04em'}}>WELLNESS LOW</div>
+          </div>
+          <RadarChart size={260} data={[
+            {label:'Academics',value:72},
+            {label:'Campus Life',value:45},
+            {label:'Finances',value:30},
+            {label:'Wellness',value:18},
+            {label:'Housing',value:55},
+          ]}/>
+          <button style={{
+            width:'100%',marginTop:8,background:C.greenSoft,border:`1px solid ${C.green}33`,borderRadius:12,
+            padding:'10px',fontFamily:SANS,fontSize:13,fontWeight:600,color:C.green,cursor:'pointer',
+            display:'flex',alignItems:'center',justifyContent:'center',gap:6,
+          }}>
+            <Icon name="heart" size={14} color={C.green}/>Suggest balancing activities
+          </button>
+        </div>
+
+        {/* Active agents */}
+        <div style={{fontFamily:SANS,fontSize:11,fontWeight:700,color:C.textMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:10,padding:'0 4px'}}>Active</div>
+        <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:18}}>
+          {flowState==='track' && (
+            <ScanningCard progress={scanProgress} stage={scanStage} stageNames={stageNames} stageDetails={stageDetails}/>
+          )}
+          <MilestoneCard/>
+          <OpportunityCard/>
+        </div>
+
+        {/* Missed */}
+        <div style={{fontFamily:SANS,fontSize:11,fontWeight:700,color:C.textMid,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:10,padding:'0 4px'}}>Missed</div>
+        <div style={{background:C.surface,borderRadius:16,border:`1px dashed ${C.border}`,padding:'14px 14px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+            <div style={{width:32,height:32,borderRadius:9,background:'#fdf6e6',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <Icon name="clock" size={16} color={C.gold}/>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:SANS,fontSize:14,fontWeight:600,color:C.text}}>ALES Undergraduate Award</div>
+              <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>94% match · Closed Jan 15</div>
+            </div>
+          </div>
+          <div style={{padding:'9px 12px',background:C.greenSoft,borderRadius:10,fontFamily:SANS,fontSize:12,color:C.green,display:'flex',alignItems:'center',gap:8}}>
+            <Icon name="sparkles" size={13} color={C.green}/>
+            <span>Similar: <strong>FGSR Travel Award</strong> opens Jun 1</span>
+          </div>
+        </div>
+      </div>
+
+      {/* What-If Sheet */}
+      <Sheet open={whatIfOpen} onClose={()=>setWhatIfOpen(false)}>
+        <WhatIfPanel/>
+      </Sheet>
+    </div>
+  );
+};
+
+const ScanningCard = ({progress,stage,stageNames,stageDetails}) => {
+  const isFound = stage===3;
+  return (
+    <div style={{
+      background:C.surface,borderRadius:18,
+      border:`1.5px solid ${isFound?C.green:C.border}`,
+      padding:'16px',position:'relative',overflow:'hidden',
+      boxShadow:isFound?`0 4px 20px ${C.green}22`:'0 1px 3px rgba(0,0,0,.04)',
+      transition:'border-color .4s, box-shadow .4s',
+    }}>
+      {!isFound && (
+        <div style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden'}}>
+          <div style={{position:'absolute',left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${C.green}66,transparent)`,animation:'scanLine 2s linear infinite'}}></div>
+        </div>
+      )}
+
+      <div style={{display:'flex',alignItems:'flex-start',gap:12,marginBottom:12,position:'relative'}}>
+        <div style={{width:36,height:36,borderRadius:11,background:C.greenSoft,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+          <Icon name="sparkles" size={18} color={C.green} strokeWidth={1.8}/>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+            <span style={{fontFamily:SANS,fontSize:10,fontWeight:700,color:C.green,textTransform:'uppercase',letterSpacing:'.06em'}}>Agent</span>
+            <span style={{fontFamily:SANS,fontSize:10,color:C.textLight}}>· just now</span>
+          </div>
+          <div style={{fontFamily:SERIF,fontSize:17,fontWeight:600,color:C.text}}>Quiet study room</div>
+          <div style={{fontFamily:SANS,fontSize:12,color:isFound?C.green:C.textMid,marginTop:3,fontWeight:isFound?600:400,display:'flex',alignItems:'center',gap:5}}>
+            {!isFound && <PulsingDot size={5}/>}
+            {isFound ? '✓' : ''} {stageDetails[stage]}
+          </div>
+        </div>
+      </div>
+
+      {/* Stage tracker */}
+      <div style={{display:'flex',gap:6,marginBottom:12}}>
+        {stageNames.map((n,i)=>(
+          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',gap:5}}>
+            <div style={{height:3,borderRadius:2,background:i<=stage?C.green:C.border,transition:'background .3s'}}></div>
+            <div style={{fontFamily:SANS,fontSize:9.5,color:i===stage?C.green:C.textLight,fontWeight:i===stage?700:500,letterSpacing:'.02em'}}>{n}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Live counter */}
+      {!isFound && (
+        <div style={{display:'flex',gap:14,padding:'10px 12px',background:C.bg,borderRadius:10}}>
+          <Stat label="Scanned" value={Math.round(progress*8.4)} icon="eye"/>
+          <Stat label="Filtered" value={stage>=1?Math.round(progress*1.7):0} icon="sliders"/>
+          <Stat label="Matches" value={stage>=2?Math.max(0,Math.round((progress-66)/12)):0} icon="target" highlight/>
+        </div>
+      )}
+
+      {isFound && (
+        <div style={{padding:'12px 14px',background:C.greenSoft,borderRadius:12,border:`1px solid ${C.green}33`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+            <div style={{fontFamily:SERIF,fontSize:16,fontWeight:600,color:C.text}}>CAB 2-690</div>
+            <div style={{padding:'2px 8px',borderRadius:9,background:C.green,fontFamily:SANS,fontSize:9,fontWeight:700,color:'white',letterSpacing:'.04em'}}>OPEN</div>
+          </div>
+          <div style={{fontFamily:SANS,fontSize:12,color:C.textMid}}>Tomorrow · 1:00–5:00 PM · Whiteboard ✓</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Stat = ({label,value,icon,highlight}) => (
+  <div style={{flex:1}}>
+    <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+      <Icon name={icon} size={11} color={highlight?C.green:C.textLight}/>
+      <span style={{fontFamily:SANS,fontSize:10,color:C.textLight,fontWeight:500}}>{label}</span>
+    </div>
+    <div style={{fontFamily:SERIF,fontSize:18,fontWeight:600,color:highlight?C.green:C.text,letterSpacing:'-0.01em'}}>{value}</div>
+  </div>
+);
+
+const MilestoneCard = () => {
+  const subs=[
+    {l:'Identify 3 advisors',done:true},
+    {l:'Email Dr. Lin',done:true},
+    {l:'Submit 2 grant apps',done:false},
+    {l:'Lock summer position',done:false},
+  ];
+  const completed = subs.filter(s=>s.done).length;
+  return (
+    <div style={{background:C.surface,borderRadius:18,border:`1px solid ${C.border}`,padding:'16px'}}>
+      <div style={{display:'flex',alignItems:'flex-start',gap:12,marginBottom:12}}>
+        <div style={{width:36,height:36,borderRadius:11,background:'#7a4ec618',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+          <Icon name="flag" size={18} color="#7a4ec6" strokeWidth={1.8}/>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+            <span style={{fontFamily:SANS,fontSize:10,fontWeight:700,color:'#7a4ec6',textTransform:'uppercase',letterSpacing:'.06em'}}>Milestone</span>
+            <span style={{fontFamily:SANS,fontSize:10,color:C.textLight}}>· 14 days left</span>
+          </div>
+          <div style={{fontFamily:SERIF,fontSize:17,fontWeight:600,color:C.text}}>Summer research position</div>
+          <div style={{fontFamily:SANS,fontSize:12,color:C.textMid,marginTop:3}}>{completed}/{subs.length} steps complete</div>
+        </div>
+      </div>
+      {/* Step checklist */}
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {subs.map((s,i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
+            <div style={{width:16,height:16,borderRadius:5,border:`1.5px solid ${s.done?'#7a4ec6':C.border}`,background:s.done?'#7a4ec6':'transparent',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {s.done && <Icon name="check" size={11} color="white" strokeWidth={3}/>}
+            </div>
+            <span style={{fontFamily:SANS,fontSize:13,color:s.done?C.textLight:C.text,textDecoration:s.done?'line-through':'none'}}>{s.l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const OpportunityCard = () => {
+  const days=4, hrs=12;
+  return (
+    <div style={{background:C.surface,borderRadius:18,border:`1px solid ${C.border}`,padding:'16px'}}>
+      <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+        <div style={{width:36,height:36,borderRadius:11,background:C.goldLight,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+          <Icon name="star" size={18} color={C.gold} strokeWidth={1.8}/>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+            <span style={{fontFamily:SANS,fontSize:10,fontWeight:700,color:'#9a7400',textTransform:'uppercase',letterSpacing:'.06em'}}>Opportunity</span>
+          </div>
+          <div style={{fontFamily:SERIF,fontSize:17,fontWeight:600,color:C.text}}>BIOL 207 add/drop deadline</div>
+          <div style={{fontFamily:SANS,fontSize:12,color:C.textMid,marginTop:3}}>Friday · 4:30 PM</div>
+        </div>
+        {/* Countdown */}
+        <div style={{textAlign:'right'}}>
+          <div style={{fontFamily:SERIF,fontSize:24,fontWeight:600,color:C.gold,lineHeight:1,letterSpacing:'-0.02em'}}>{days}d</div>
+          <div style={{fontFamily:SANS,fontSize:10,color:C.textLight,marginTop:2}}>{hrs}h left</div>
+        </div>
+      </div>
+      <div style={{marginTop:12,display:'flex',gap:6}}>
+        <button style={{flex:1,padding:'9px',background:C.gold,border:'none',borderRadius:10,fontFamily:SANS,fontSize:12,fontWeight:700,color:'white',cursor:'pointer'}}>Draft email to advisor</button>
+        <button style={{padding:'9px 12px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,fontFamily:SANS,fontSize:12,fontWeight:600,color:C.textMid,cursor:'pointer'}}>Snooze</button>
+      </div>
+    </div>
+  );
+};
+
+// What-If: find similar events from a flyer
+const WhatIfPanel = () => {
+  const [stage,setStage]=React.useState('intro'); // intro→uploaded→matches
+  const [matches,setMatches]=React.useState([]);
+
+  const handleUpload = () => {
+    setStage('analyzing');
+    setTimeout(()=>{
+      setMatches([
+        {title:'CCIS Career Fair',org:'Faculty of Science',date:'Apr 22 · 10–3 PM',similarity:96,tags:['Career','STEM','On-campus']},
+        {title:'Engineering Co-op Meet',org:'EAS',date:'Apr 25 · 4–7 PM',similarity:88,tags:['Career','Co-op','Networking']},
+        {title:'Bio Research Showcase',org:'Biology Department',date:'May 3 · 12–4 PM',similarity:81,tags:['Research','STEM','Posters']},
+      ]);
+      setStage('matches');
+    },1600);
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+        <Icon name="image" size={16} color={C.green}/>
+        <div style={{fontFamily:SERIF,fontSize:20,fontWeight:600,color:C.text}}>What-If</div>
+      </div>
+      <div style={{fontFamily:SANS,fontSize:13,color:C.textLight,marginBottom:18}}>Snap a flyer of an event you missed — I'll surface similar ones coming up.</div>
+
+      {stage==='intro' && (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <button onClick={handleUpload} style={{
+            padding:'24px 18px',background:C.greenSoft,border:`2px dashed ${C.green}55`,borderRadius:18,
+            cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:10,
+          }}>
+            <div style={{width:48,height:48,borderRadius:'50%',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',color:C.green}}>
+              <Icon name="camera" size={22}/>
+            </div>
+            <div style={{fontFamily:SERIF,fontSize:16,fontWeight:600,color:C.text}}>Snap a flyer</div>
+            <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,textAlign:'center'}}>I'll pull dates, themes, and tags</div>
+          </button>
+          <button onClick={handleUpload} style={{
+            padding:'14px 16px',background:C.bg,border:`1px solid ${C.border}`,borderRadius:14,
+            cursor:'pointer',display:'flex',alignItems:'center',gap:10,
+          }}>
+            <Icon name="link" size={16} color={C.textMid}/>
+            <span style={{fontFamily:SANS,fontSize:14,color:C.text,flex:1,textAlign:'left'}}>Paste an event URL</span>
+            <Icon name="chevron-right" size={14} color={C.textLight}/>
+          </button>
+          <button onClick={handleUpload} style={{
+            padding:'14px 16px',background:C.bg,border:`1px solid ${C.border}`,borderRadius:14,
+            cursor:'pointer',display:'flex',alignItems:'center',gap:10,
+          }}>
+            <Icon name="chat" size={16} color={C.textMid}/>
+            <span style={{fontFamily:SANS,fontSize:14,color:C.text,flex:1,textAlign:'left'}}>Describe it instead</span>
+            <Icon name="chevron-right" size={14} color={C.textLight}/>
+          </button>
+        </div>
+      )}
+
+      {stage==='analyzing' && (
+        <div style={{padding:'40px 0',textAlign:'center'}}>
+          <div style={{width:64,height:64,margin:'0 auto 18px',position:'relative'}}>
+            <div style={{position:'absolute',inset:0,borderRadius:'50%',border:`3px solid ${C.greenSoft}`}}></div>
+            <div style={{position:'absolute',inset:0,borderRadius:'50%',border:`3px solid ${C.green}`,borderTopColor:'transparent',borderRightColor:'transparent',animation:'pulseRing 1s linear infinite'}}></div>
+            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',color:C.green}}>
+              <Icon name="image" size={22}/>
+            </div>
+          </div>
+          <div style={{fontFamily:SERIF,fontSize:16,fontWeight:600,color:C.text}}>Reading your flyer…</div>
+          <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,marginTop:6}}>Extracting themes · matching events</div>
+        </div>
+      )}
+
+      {stage==='matches' && (
+        <div>
+          <div style={{padding:'10px 12px',background:C.greenSoft,borderRadius:12,border:`1px solid ${C.green}33`,marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
+            <Icon name="sparkles" size={14} color={C.green}/>
+            <span style={{fontFamily:SANS,fontSize:12,color:C.green,fontWeight:600}}>Found 3 similar events on the way</span>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {matches.map((m,i)=>(
+              <div key={i} style={{padding:'14px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,animation:`fadeUp .35s ease ${i*0.08}s both`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:SERIF,fontSize:15,fontWeight:600,color:C.text}}>{m.title}</div>
+                    <div style={{fontFamily:SANS,fontSize:12,color:C.textLight}}>{m.org} · {m.date}</div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:4,padding:'3px 9px',borderRadius:11,background:C.greenSoft}}>
+                    <span style={{fontFamily:SANS,fontSize:11,fontWeight:700,color:C.green}}>{m.similarity}%</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
+                  {m.tags.map(t=><div key={t} style={{padding:'3px 8px',background:C.bg,borderRadius:9,fontFamily:SANS,fontSize:10,color:C.textMid,border:`1px solid ${C.border}`}}>{t}</div>)}
+                </div>
+                <div style={{display:'flex',gap:6}}>
+                  <button style={{flex:1,padding:'8px',background:C.green,border:'none',borderRadius:9,fontFamily:SANS,fontSize:12,fontWeight:600,color:'white',cursor:'pointer'}}>Add to Track</button>
+                  <button style={{padding:'8px 12px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:9,fontFamily:SANS,fontSize:12,fontWeight:500,color:C.textMid,cursor:'pointer'}}>Details</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════
+// PROFILE TAB
+// ═══════════════════════════════════════════════════════
+const ProfileTab = () => {
+  const [photoUrl,setPhotoUrl]=React.useState(null);
+  const fileRef=React.useRef(null);
+  const onFile=e=>{
+    const f=e.target.files[0];
+    if(f) setPhotoUrl(URL.createObjectURL(f));
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg}}>
+      <div style={{padding:'14px 20px 12px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+        <div style={{fontFamily:SERIF,fontSize:24,fontWeight:500,color:C.text,letterSpacing:'-0.01em'}}>Profile</div>
+        <div style={{fontFamily:SANS,fontSize:12,color:C.textLight,marginTop:1}}>University of Alberta · 2025–26</div>
+      </div>
+
+      <div style={{flex:1,overflowY:'auto',padding:'20px 16px 100px'}}>
+        {/* OneCard */}
+        <div style={{
+          position:'relative',borderRadius:22,overflow:'hidden',height:200,
+          background:'linear-gradient(135deg,#0e3a26 0%,#1c5d3e 50%,#3d8a4f 100%)',
+          boxShadow:'0 8px 36px rgba(28,93,62,.32)',marginBottom:24,
+        }}>
+          {/* Geometric pattern */}
+          <svg style={{position:'absolute',right:0,top:0,height:'100%',opacity:.18}} viewBox="0 0 220 200" preserveAspectRatio="xMidYMid slice">
+            <circle cx="155" cy="100" r="130" fill="none" stroke={C.gold} strokeWidth="1.5"/>
+            <circle cx="155" cy="100" r="90" fill="none" stroke={C.gold} strokeWidth="1.5"/>
+            <circle cx="155" cy="100" r="50" fill="none" stroke={C.gold} strokeWidth="1.5"/>
+            <polygon points="155,15 220,75 195,170 95,170 75,75" fill="none" stroke={C.gold} strokeWidth="1.5"/>
+            <polygon points="155,50 195,90 175,150 125,150 105,90" fill="none" stroke={C.gold} strokeWidth="1.5"/>
+          </svg>
+          {/* Big A */}
+          <div style={{position:'absolute',right:24,top:'50%',transform:'translateY(-50%)',
+            fontFamily:SERIF,fontSize:118,fontWeight:700,color:C.gold,opacity:.28,lineHeight:1,userSelect:'none',letterSpacing:'-0.04em'}}>A</div>
+          {/* Badge */}
+          <div style={{position:'absolute',bottom:16,right:18,background:C.gold,borderRadius:18,padding:'4px 12px',
+            fontFamily:SANS,fontSize:11,fontWeight:700,color:'#1f1a08',letterSpacing:'.02em'}}>one card</div>
+          {/* Photo */}
+          <div style={{position:'absolute',left:20,top:'50%',transform:'translateY(-50%)'}}>
+            <button onClick={()=>fileRef.current&&fileRef.current.click()} style={{
+              width:80,height:100,borderRadius:10,overflow:'hidden',cursor:'pointer',padding:0,
+              background:photoUrl?'transparent':'rgba(255,255,255,.12)',
+              border:photoUrl?'2px solid rgba(255,255,255,.4)':'2px dashed rgba(255,255,255,.55)',
+              display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:6,
+            }}>
+              {photoUrl ? <img src={photoUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> :
+                <>
+                  <Icon name="camera" size={20} color="rgba(255,255,255,.85)"/>
+                  <span style={{fontFamily:SANS,fontSize:9,color:'rgba(255,255,255,.7)',textAlign:'center',padding:'0 4px',lineHeight:1.3}}>Add photo</span>
+                </>
+              }
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
+          </div>
+          {/* Info */}
+          <div style={{position:'absolute',left:118,bottom:16,right:88}}>
+            <div style={{fontFamily:SERIF,fontSize:17,fontWeight:600,color:'white',letterSpacing:'-0.01em'}}>Alex Okonkwo</div>
+            <div style={{fontFamily:SANS,fontSize:11,color:'rgba(255,255,255,.82)',marginTop:3}}>BSc Biology · Year 2</div>
+            <div style={{fontFamily:SANS,fontSize:11,color:'rgba(255,255,255,.65)',marginTop:1}}>ID: 1623847</div>
+          </div>
+          {/* Wordmark */}
+          <div style={{position:'absolute',left:118,top:18,display:'flex',alignItems:'center',gap:7}}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z" stroke="white" strokeWidth="1.5" fill="rgba(255,255,255,.1)"/>
+              <text x="12" y="15" textAnchor="middle" fontFamily={SERIF} fontSize="9" fontWeight="700" fill={C.gold}>U</text>
+            </svg>
+            <div>
+              <div style={{fontFamily:SANS,fontSize:7.5,fontWeight:800,color:'white',letterSpacing:'.08em',lineHeight:1.3}}>UNIVERSITY</div>
+              <div style={{fontFamily:SANS,fontSize:7.5,fontWeight:800,color:'white',letterSpacing:'.08em',lineHeight:1.3}}>OF ALBERTA</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Stashes */}
+        <ProfileSection title="Stashes" sub="Your private knowledge base" icon="book" color={C.green}
+          items={[
+            {label:'BIOL 207 Syllabus',meta:'PDF · 1.4 MB',icon:'book'},
+            {label:'uab.ca/scholarships',meta:'Bookmarked Apr 12',icon:'link'},
+            {label:'Co-op handbook',meta:'PDF · 2.1 MB',icon:'briefcase'},
+          ]}/>
+
+        {/* Profile facts AI has learned */}
+        <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,marginBottom:14,overflow:'hidden'}}>
+          <div style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:8,borderBottom:`1px solid ${C.border}`}}>
+            <Icon name="sparkles" size={16} color={C.green}/>
+            <div style={{fontFamily:SANS,fontSize:13,fontWeight:700,color:C.text,flex:1}}>What I've learned</div>
+            <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>7 facts</div>
+          </div>
+          <div style={{padding:'8px 0'}}>
+            {[
+              'Prefers morning classes',
+              'Strongest in BIOL 207 (87%)',
+              'Studies on North Campus',
+              'Drinks coffee mid-afternoon',
+            ].map((f,i,arr)=>(
+              <div key={i} style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:10,borderBottom:i<arr.length-1?`1px solid ${C.border}`:'none'}}>
+                <div style={{width:5,height:5,borderRadius:'50%',background:C.green,flexShrink:0}}></div>
+                <span style={{fontFamily:SANS,fontSize:13,color:C.text,flex:1}}>{f}</span>
+                <button style={{background:'none',border:'none',cursor:'pointer',color:C.textLight,padding:4}}>
+                  <Icon name="x" size={13}/>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Settings */}
+        <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,overflow:'hidden',marginBottom:8}}>
+          {[
+            {l:'Notifications',ic:'bell'},
+            {l:'Data & Privacy',ic:'shield'},
+            {l:'Connected integrations',ic:'link'},
+            {l:'Export my data',ic:'arrow-down'},
+            {l:'Delete profile data',ic:'trash',danger:true},
+          ].map((it,i,arr)=>(
+            <button key={i} style={{
+              width:'100%',padding:'14px 16px',display:'flex',alignItems:'center',gap:12,
+              background:'none',border:'none',borderBottom:i<arr.length-1?`1px solid ${C.border}`:'none',
+              cursor:'pointer',textAlign:'left',
+            }}>
+              <Icon name={it.ic} size={17} color={it.danger?C.err:C.textMid}/>
+              <span style={{fontFamily:SANS,fontSize:14,color:it.danger?C.err:C.text,flex:1,fontWeight:500}}>{it.l}</span>
+              <Icon name="chevron-right" size={15} color={C.textLight}/>
+            </button>
+          ))}
+        </div>
+
+        <div style={{textAlign:'center',padding:'14px 0 8px',fontFamily:SANS,fontSize:11,color:C.textLight}}>
+          Beartracks · v0.1.0 · UAlberta
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProfileSection = ({title,sub,icon,color,items}) => (
+  <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,marginBottom:14,overflow:'hidden'}}>
+    <div style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:10,borderBottom:`1px solid ${C.border}`}}>
+      <Icon name={icon} size={16} color={color}/>
+      <div style={{flex:1}}>
+        <div style={{fontFamily:SANS,fontSize:13,fontWeight:700,color:C.text}}>{title}</div>
+        <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>{sub}</div>
+      </div>
+      <button style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:9,padding:'4px 10px',fontFamily:SANS,fontSize:11,fontWeight:600,color:C.textMid,cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
+        <Icon name="plus" size={11}/>Add
+      </button>
+    </div>
+    <div style={{padding:'4px 0'}}>
+      {items.map((it,i)=>(
+        <button key={i} style={{
+          width:'100%',padding:'11px 14px',display:'flex',alignItems:'center',gap:10,
+          background:'none',border:'none',borderBottom:i<items.length-1?`1px solid ${C.border}`:'none',
+          cursor:'pointer',textAlign:'left',
+        }}>
+          <Icon name={it.icon} size={15} color={C.textLight}/>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:SANS,fontSize:13,color:C.text}}>{it.label}</div>
+            <div style={{fontFamily:SANS,fontSize:11,color:C.textLight}}>{it.meta}</div>
+          </div>
+          <Icon name="chevron-right" size={14} color={C.textLight}/>
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════
+// TWEAKS PANEL
+// ═══════════════════════════════════════════════════════
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#1c5d3e",
+  "fontDisplay": "Georgia",
+  "showRadar": false,
+  "chipRadius": 18
+}/*EDITMODE-END*/;
+
+const TweaksPanel = ({open,onClose}) => {
+  const [t,setT]=React.useState(TWEAK_DEFAULTS);
+  const set=(k,v)=>{
+    setT(p=>({...p,[k]:v}));
+    window.parent.postMessage({type:'__edit_mode_set_keys',edits:{[k]:v}},'*');
+  };
+  return (
+    <div style={{
+      position:'fixed',bottom:24,right:18,zIndex:9999,
+      width:240,background:'white',borderRadius:18,
+      boxShadow:'0 12px 48px rgba(0,0,0,.24)',
+      border:`1px solid ${C.border}`,
+      transform:open?'translateY(0) scale(1)':'translateY(20px) scale(.95)',
+      opacity:open?1:0,pointerEvents:open?'all':'none',
+      transition:'all .28s cubic-bezier(.34,1.56,.64,1)',overflow:'hidden',
+    }}>
+      <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <span style={{fontFamily:SERIF,fontSize:15,fontWeight:600,color:C.text}}>Tweaks</span>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:C.textLight,padding:2,display:'flex'}}><Icon name="x" size={16}/></button>
+      </div>
+      <div style={{padding:'14px 16px'}}>
+        <Row label="Accent">
+          <input type="color" value={t.accentColor} onChange={e=>set('accentColor',e.target.value)} style={{width:32,height:24,border:'none',borderRadius:5,padding:0,cursor:'pointer'}}/>
+        </Row>
+        <Row label="Display font">
+          <select value={t.fontDisplay} onChange={e=>set('fontDisplay',e.target.value)} style={{fontSize:11,fontFamily:SANS,border:`1px solid ${C.border}`,borderRadius:7,padding:'3px 6px',background:C.bg,color:C.text}}>
+            <option>Fraunces</option><option>Georgia</option><option>Inter</option>
+          </select>
+        </Row>
+        <Row label={`Chip radius ${t.chipRadius}px`}>
+          <input type="range" min="0" max="24" step="2" value={t.chipRadius} onChange={e=>set('chipRadius',+e.target.value)} style={{width:90}}/>
+        </Row>
+        <Row label="Engagement radar">
+          <Toggle on={t.showRadar} onChange={()=>set('showRadar',!t.showRadar)}/>
+        </Row>
+      </div>
+    </div>
+  );
+};
+const Row = ({label,children}) => (
+  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+    <span style={{fontFamily:SANS,fontSize:12,color:C.textMid,flex:1}}>{label}</span>
+    {children}
+  </div>
+);
+const Toggle = ({on,onChange}) => (
+  <button onClick={onChange} style={{
+    width:38,height:22,borderRadius:11,border:'none',background:on?C.green:C.border,
+    position:'relative',cursor:'pointer',transition:'background .2s',
+  }}>
+    <div style={{position:'absolute',top:2,left:on?18:2,width:18,height:18,borderRadius:'50%',background:'white',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.15)'}}></div>
+  </button>
+);
+
+// ═══════════════════════════════════════════════════════
+// APP ROOT
+// ═══════════════════════════════════════════════════════
+const App = () => {
+  const [tab,setTab]=React.useState('ask');
+  const [flow,setFlow]=React.useState('idle');
+  const [nudge,setNudge]=React.useState(false);
+  const [tweaksOpen,setTweaksOpen]=React.useState(false);
+
+  React.useEffect(()=>{
+    const h=e=>{
+      if(e.data?.type==='__activate_edit_mode') setTweaksOpen(true);
+      if(e.data?.type==='__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message',h);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return ()=>window.removeEventListener('message',h);
+  },[]);
+
+  const goTo=(t)=>{ if(t!==tab) setTab(t); };
+
+  const onAskAdvance=()=>{
+    setFlow('create');
+    setTimeout(()=>goTo('create'),350);
+  };
+  const onDeploy=()=>{
+    setFlow('track');
+    setTimeout(()=>goTo('track'),350);
+  };
+  const onNudge=()=>{
+    setNudge(true);
+    setTimeout(()=>{ setNudge(false); setFlow('nudge'); goTo('ask'); },2600);
+  };
+
+  const tabs = {
+    ask: <AskTab flowState={flow} onAdvance={onAskAdvance}/>,
+    create: <CreateTab flowState={flow} onDeploy={onDeploy}/>,
+    track: <TrackTab flowState={flow} onNudge={onNudge}/>,
+    profile: <ProfileTab/>,
+  };
+
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',width:'100vw',
+      background:'linear-gradient(135deg,#0a1610 0%,#142318 50%,#0a1610 100%)'}}>
+      <div style={{
+        position:'relative',width:'100%',maxWidth:430,height:'100%',maxHeight:932,
+        background:C.surface,overflow:'hidden',display:'flex',flexDirection:'column',
+        boxShadow:'0 40px 120px rgba(0,0,0,.6)',
+      }}>
+        {nudge && (
+          <div style={{position:'absolute',top:54,left:14,right:14,zIndex:500,
+            background:C.greenDeep,borderRadius:16,padding:'14px 16px',
+            display:'flex',alignItems:'center',gap:12,
+            boxShadow:`0 12px 40px ${C.green}66`,
+            animation:'nudgePop .4s cubic-bezier(.34,1.56,.64,1) forwards',
+          }}>
+            <div style={{width:36,height:36,borderRadius:'50%',background:'rgba(212,167,44,.25)',display:'flex',alignItems:'center',justifyContent:'center',color:C.gold}}>
+              <Icon name="target" size={18}/>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:SANS,fontSize:13,fontWeight:700,color:'white'}}>Match found</div>
+              <div style={{fontFamily:SANS,fontSize:11,color:'rgba(255,255,255,.78)',marginTop:2}}>CAB 2-690 · Tomorrow 1–5 PM</div>
+            </div>
+            <button style={{background:C.gold,border:'none',borderRadius:10,padding:'7px 12px',color:'#1f1a08',fontFamily:SANS,fontSize:12,fontWeight:700,cursor:'pointer'}}>View</button>
+          </div>
+        )}
+
+        <StatusBar/>
+        <div style={{flex:1,overflow:'hidden',position:'relative'}}>
+          {tabs[tab]}
+        </div>
+        <BottomNav active={tab} onChange={goTo}/>
+      </div>
+      <TweaksPanel open={tweaksOpen} onClose={()=>{setTweaksOpen(false);window.parent.postMessage({type:'__edit_mode_dismissed'},'*');}}/>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
